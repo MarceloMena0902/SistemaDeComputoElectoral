@@ -1,0 +1,14 @@
+{
+  "name": "automatizacion-computo-oficial",
+  "version": "1.0.0",
+  "description": "Automatización de carga masiva de actas oficiales desde CSV",
+  "main": "src/import_actas_csv.js",
+  "scripts": {
+    "mock": "node src/mock_backend_oficial.js",
+    "import": "node src/import_actas_csv.js"
+  },
+  "dependencies": {
+    "csv-parser": "^3.0.0",
+    "express": "^4.18.3"
+  }
+}
