@@ -1,0 +1,114 @@
+version: '3.8'
+
+# ============================================================
+# SISTEMA DE COMPUTO OFICIAL - Orquestacion Docker
+# PostgreSQL Streaming Replication + HAProxy HA + FastAPI
+# ============================================================
+
+services:
+
+  # ─── Base de Datos Primaria (Master) ────────────────────
+  postgres-primary:
+    build:
+      context: ./postgres/primary
+      dockerfile: Dockerfile
+    container_name: computo-postgres-primary
+    environment:
+      POSTGRES_DB: computo_oficial
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-electoral2024}
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-repl2024secure}
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - pg-primary-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"   # PostgreSQL directo (admin/debug)
+      - "8008:8008"   # Healthcheck HTTP
+    networks:
+      - electoral-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d computo_oficial"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    restart: unless-stopped
+
+  # ─── Base de Datos Secundaria (Standby / Replica) ────────
+  postgres-standby:
+    build:
+      context: ./postgres/standby
+      dockerfile: Dockerfile
+    container_name: computo-postgres-standby
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-electoral2024}
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-repl2024secure}
+      PRIMARY_HOST: postgres-primary
+      PRIMARY_PORT: 5432
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - pg-standby-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"   # PostgreSQL standby directo
+      - "8009:8008"   # Healthcheck HTTP standby
+    networks:
+      - electoral-net
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── HAProxy: Alta Disponibilidad y Balanceo ─────────────
+  haproxy:
+    build:
+      context: ./haproxy
+      dockerfile: Dockerfile
+    container_name: computo-haproxy
+    ports:
+      - "5000:5000"   # Puerto ESCRITURA (solo primary)
+      - "5001:5001"   # Puerto LECTURA (cualquier nodo disponible)
+      - "7000:7000"   # Dashboard de estadisticas HAProxy
+    networks:
+      - electoral-net
+    depends_on:
+      - postgres-primary
+      - postgres-standby
+    restart: unless-stopped
+
+  # ─── API Backend: FastAPI ─────────────────────────────────
+  api:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: computo-api
+    environment:
+      # Conexion de escritura → va por HAProxy puerto 5000 (solo primary)
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-electoral2024}@haproxy:5000/computo_oficial
+      # Conexion de lectura → va por HAProxy puerto 5001 (cualquier nodo)
+      DATABASE_URL_READ: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-electoral2024}@haproxy:5001/computo_oficial
+      SECRET_KEY: ${SECRET_KEY:-electoral-secret-key-2024}
+      RUN_MIGRATIONS: "true"
+    ports:
+      - "4000:8000"   # Puerto 4000 externo → compatible con automatizacion existente
+    networks:
+      - electoral-net
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    restart: unless-stopped
+
+# ─── Volumes Persistentes ────────────────────────────────────
+volumes:
+  pg-primary-data:
+    name: computo_pg_primary
+  pg-standby-data:
+    name: computo_pg_standby
+
+# ─── Red Interna ─────────────────────────────────────────────
+networks:
+  electoral-net:
+    name: computo-electoral-net
+    driver: bridge

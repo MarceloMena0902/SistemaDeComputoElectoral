@@ -1,6 +1,7 @@
 {
   "csvPath": "./data/actas_oficiales_transcripcion.csv",
-  "apiUrl": "http://localhost:4000/api/oficial/actas",
+  "apiUrl": "http://localhost:4000/api/actas/registro",
+  "apiUrlAlias": "http://localhost:4000/api/oficial/actas",
   "defaultUserId": 1,
   "batchDelayMs": 50,
   "stopOnError": false
