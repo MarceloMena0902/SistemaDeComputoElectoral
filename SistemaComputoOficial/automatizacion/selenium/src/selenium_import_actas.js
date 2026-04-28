@@ -143,9 +143,15 @@ async function main() {
   fs.writeFileSync(resultLogPath, "", "utf8");
   fs.writeFileSync(errorLogPath, "", "utf8");
 
-  const rows = await readCsv();
+//   const rows = await readCsv();
 
-  console.log(`Filas encontradas para Selenium: ${rows.length}`);
+//   console.log(`Filas encontradas para Selenium: ${rows.length}`);
+    const allRows = await readCsv();
+    const limit = Number(config.seleniumLimit || 0);
+    const rows = limit > 0 ? allRows.slice(0, limit) : allRows;
+
+    console.log(`Filas encontradas en CSV: ${allRows.length}`);
+    console.log(`Filas a procesar con Selenium: ${rows.length}`);
 
   const driver = await new Builder().forBrowser("chrome").build();
 
