@@ -18,5 +18,8 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# Claude Code local settings (no commitear)
+.claude/
+
 SistemaComputoOficial/automatizacion/logs/*.jsonl
 SistemaComputoOficial/automatizacion/logs/*.log
