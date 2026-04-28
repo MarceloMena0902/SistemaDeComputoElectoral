@@ -1,5 +1,5 @@
 {
-  "csvPath": "./data/actas_oficiales_transcripcion.csv",
+  "csvPath": "./data/actas_oficiales_transcripcion_error.csv",
   "apiUrl": "http://localhost:4000/api/oficial/actas",
   "defaultUserId": 1,
   "batchDelayMs": 50,

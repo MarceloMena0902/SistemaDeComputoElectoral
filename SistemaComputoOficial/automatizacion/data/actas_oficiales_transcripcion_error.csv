@@ -1,0 +1,4 @@
+﻿nro_acta,codigo_territorial,codigo_mesa,nro_mesa,nro_votantes,partido1,partido2,partido3,partido4,votos_blancos,votos_nulos,registrado_por
+ACTA-OK-001,10101,10101001001,1,339,10,4,9,28,14,45,1
+ACTA-ERROR-001,10101,10101001999,99,100,80,50,30,20,10,5,1
+ACTA-OK-002,10102,10102002001,1,175,25,30,40,20,10,5,1

@@ -33,20 +33,33 @@ function readCsv() {
   });
 }
 
+function normalizeRow(row) {
+  const normalized = {};
+
+  for (const [key, value] of Object.entries(row)) {
+    const cleanKey = key.replace(/^\uFEFF/, "").trim();
+    normalized[cleanKey] = typeof value === "string" ? value.trim() : value;
+  }
+
+  return normalized;
+}
+
 function buildRow(row) {
+  const cleanRow = normalizeRow(row);
+
   return {
-    nro_acta: row.nro_acta,
-    codigo_territorial: String(row.codigo_territorial || row.CodigoTerritorial || ""),
-    codigo_mesa: String(row.codigo_mesa || row.CodigoMesa || ""),
-    nro_mesa: String(row.nro_mesa || row.Mesa || ""),
-    nro_votantes: String(row.nro_votantes || row.NroVotantes || ""),
-    partido1: String(row.partido1 || 0),
-    partido2: String(row.partido2 || 0),
-    partido3: String(row.partido3 || 0),
-    partido4: String(row.partido4 || 0),
-    votos_blancos: String(row.votos_blancos || 0),
-    votos_nulos: String(row.votos_nulos || 0),
-    registrado_por: String(row.registrado_por || config.defaultUserId || 1)
+    nro_acta: String(cleanRow.nro_acta || cleanRow.NroActa || cleanRow.Nro_Acta || ""),
+    codigo_territorial: String(cleanRow.codigo_territorial || cleanRow.CodigoTerritorial || ""),
+    codigo_mesa: String(cleanRow.codigo_mesa || cleanRow.CodigoMesa || ""),
+    nro_mesa: String(cleanRow.nro_mesa || cleanRow.Mesa || ""),
+    nro_votantes: String(cleanRow.nro_votantes || cleanRow.NroVotantes || ""),
+    partido1: String(cleanRow.partido1 || cleanRow.Partido1 || 0),
+    partido2: String(cleanRow.partido2 || cleanRow.Partido2 || 0),
+    partido3: String(cleanRow.partido3 || cleanRow.Partido3 || 0),
+    partido4: String(cleanRow.partido4 || cleanRow.Partido4 || 0),
+    votos_blancos: String(cleanRow.votos_blancos || cleanRow.VotosBlancos || 0),
+    votos_nulos: String(cleanRow.votos_nulos || cleanRow.VotosNulos || 0),
+    registrado_por: String(cleanRow.registrado_por || cleanRow.RegistradoPor || config.defaultUserId || 1)
   };
 }
 
