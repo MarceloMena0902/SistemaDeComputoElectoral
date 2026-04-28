@@ -20,3 +20,7 @@ Thumbs.db
 
 SistemaComputoOficial/automatizacion/logs/*.jsonl
 SistemaComputoOficial/automatizacion/logs/*.log
+
+SistemaComputoOficial/automatizacion/selenium/reports/*.jsonl
+SistemaComputoOficial/automatizacion/selenium/reports/*.log
+SistemaComputoOficial/automatizacion/selenium/screenshots/*.png

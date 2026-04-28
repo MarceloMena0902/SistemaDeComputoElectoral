@@ -1,9 +1,18 @@
 const express = require("express");
+const cors = require("cors"); 
 
 const app = express();
 const PORT = 4000;
 
+
+app.use(cors({
+  origin: "http://localhost:3005",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
+}));
+
 app.use(express.json());
+
 
 const actasRegistradas = new Map();
 
