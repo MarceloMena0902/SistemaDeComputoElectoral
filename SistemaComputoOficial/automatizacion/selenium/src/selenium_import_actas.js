@@ -1,243 +1,480 @@
 const fs = require("fs");
 const path = require("path");
-const csv = require("csv-parser");
 const { Builder, By, until } = require("selenium-webdriver");
+const chrome = require("selenium-webdriver/chrome");
 
-const configPath = path.join(__dirname, "..", "..", "config", "automation.config.json");
-const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const { readOfficialFile } = require("../../src/read_official_file");
+const { buildOfficialPayload } = require("../../src/official_csv_adapter");
 
-const csvPath = path.resolve(__dirname, "..", "..", config.csvPath);
-const resultLogPath = path.resolve(__dirname, "..", "reports", "resultado_selenium.jsonl");
-const errorLogPath = path.resolve(__dirname, "..", "reports", "errores_selenium.jsonl");
+const config = require("../../config/automation.config.json");
 
-const FORM_URL = "http://localhost:3005";
+const reportsDir = path.join(__dirname, "..", "reports");
+const screenshotsDir = path.join(__dirname, "..", "screenshots");
 
-function toNumber(value) {
-  const numberValue = Number(value);
-  return Number.isNaN(numberValue) ? 0 : numberValue;
+if (!fs.existsSync(reportsDir)) {
+  fs.mkdirSync(reportsDir, { recursive: true });
 }
 
-function appendJsonLine(filePath, data) {
+if (!fs.existsSync(screenshotsDir)) {
+  fs.mkdirSync(screenshotsDir, { recursive: true });
+}
+
+const successReportPath = path.join(reportsDir, "selenium_exitosas.jsonl");
+const errorReportPath = path.join(reportsDir, "selenium_errores.jsonl");
+const observedReportPath = path.join(reportsDir, "selenium_observadas.jsonl");
+const duplicateReportPath = path.join(reportsDir, "selenium_duplicadas.jsonl");
+
+function resetReport(filePath) {
+  fs.writeFileSync(filePath, "", "utf8");
+}
+
+function writeJsonLine(filePath, data) {
   fs.appendFileSync(filePath, `${JSON.stringify(data)}\n`, "utf8");
 }
 
-function readCsv() {
-  return new Promise((resolve, reject) => {
-    const rows = [];
-
-    fs.createReadStream(csvPath)
-      .pipe(csv())
-      .on("data", (row) => rows.push(row))
-      .on("end", () => resolve(rows))
-      .on("error", reject);
-  });
+function isEmpty(value) {
+  return value === undefined || value === null || value === "";
 }
 
-function normalizeRow(row) {
-  const normalized = {};
-
-  for (const [key, value] of Object.entries(row)) {
-    const cleanKey = key.replace(/^\uFEFF/, "").trim();
-    normalized[cleanKey] = typeof value === "string" ? value.trim() : value;
-  }
-
-  return normalized;
-}
-
-function buildRow(row) {
-  const cleanRow = normalizeRow(row);
-
-  return {
-    nro_acta: String(cleanRow.nro_acta || cleanRow.NroActa || cleanRow.Nro_Acta || ""),
-    codigo_territorial: String(cleanRow.codigo_territorial || cleanRow.CodigoTerritorial || ""),
-    codigo_mesa: String(cleanRow.codigo_mesa || cleanRow.CodigoMesa || ""),
-    nro_mesa: String(cleanRow.nro_mesa || cleanRow.Mesa || ""),
-    nro_votantes: String(cleanRow.nro_votantes || cleanRow.NroVotantes || ""),
-    partido1: String(cleanRow.partido1 || cleanRow.Partido1 || 0),
-    partido2: String(cleanRow.partido2 || cleanRow.Partido2 || 0),
-    partido3: String(cleanRow.partido3 || cleanRow.Partido3 || 0),
-    partido4: String(cleanRow.partido4 || cleanRow.Partido4 || 0),
-    votos_blancos: String(cleanRow.votos_blancos || cleanRow.VotosBlancos || 0),
-    votos_nulos: String(cleanRow.votos_nulos || cleanRow.VotosNulos || 0),
-    registrado_por: String(cleanRow.registrado_por || cleanRow.RegistradoPor || config.defaultUserId || 1)
-  };
-}
-
-function validateBeforeForm(data) {
+function validatePayload(payload) {
   const errors = [];
 
-  const p1 = toNumber(data.partido1);
-  const p2 = toNumber(data.partido2);
-  const p3 = toNumber(data.partido3);
-  const p4 = toNumber(data.partido4);
-  const blancos = toNumber(data.votos_blancos);
-  const nulos = toNumber(data.votos_nulos);
-  const nroVotantes = toNumber(data.nro_votantes);
+  if (isEmpty(payload.nro_acta)) errors.push("nro_acta es obligatorio");
+  if (isEmpty(payload.codigo_mesa)) errors.push("codigo_mesa es obligatorio");
+  if (isEmpty(payload.nro_mesa)) errors.push("nro_mesa es obligatorio");
+  if (isEmpty(payload.nro_votantes)) errors.push("nro_votantes es obligatorio");
 
-  const votosValidos = p1 + p2 + p3 + p4;
-  const totalVotos = votosValidos + blancos + nulos;
+  if (!payload.votos) {
+    errors.push("votos es obligatorio");
+    return errors;
+  }
 
-  if (!data.nro_acta) errors.push("nro_acta vacío");
-  if (!data.codigo_mesa) errors.push("codigo_mesa vacío");
-  if (!data.codigo_territorial) errors.push("codigo_territorial vacío");
-  if (!data.nro_mesa) errors.push("nro_mesa vacío");
+  const numericFields = [
+    ["nro_votantes", payload.nro_votantes],
+    ["papeletas_anfora", payload.papeletas_anfora],
+    ["papeletas_no_utilizadas", payload.papeletas_no_utilizadas],
+    ["partido1", payload.votos.partido1],
+    ["partido2", payload.votos.partido2],
+    ["partido3", payload.votos.partido3],
+    ["partido4", payload.votos.partido4],
+    ["votos_blancos", payload.votos.votos_blancos],
+    ["votos_nulos", payload.votos.votos_nulos],
+    ["votos_validos", payload.votos.votos_validos],
+    ["total_votos", payload.votos.total_votos]
+  ];
 
-  if (nroVotantes < 0) errors.push("nro_votantes inválido");
-  if (p1 < 0) errors.push("partido1 negativo");
-  if (p2 < 0) errors.push("partido2 negativo");
-  if (p3 < 0) errors.push("partido3 negativo");
-  if (p4 < 0) errors.push("partido4 negativo");
-  if (blancos < 0) errors.push("votos_blancos negativo");
-  if (nulos < 0) errors.push("votos_nulos negativo");
-  if (totalVotos > nroVotantes) errors.push("total_votos supera nro_votantes");
+  for (const [field, value] of numericFields) {
+    if (Number.isNaN(Number(value))) {
+      errors.push(`${field} debe ser numerico`);
+    }
+
+    if (Number(value) < 0) {
+      errors.push(`${field} no puede ser negativo`);
+    }
+  }
+
+  if (payload.nro_votantes <= 0) {
+    errors.push("nro_votantes debe ser mayor a 0");
+  }
+
+  if (payload.votos.total_votos > payload.nro_votantes) {
+    errors.push("total_votos supera nro_votantes");
+  }
+
+  if (payload.papeletas_anfora > payload.nro_votantes) {
+    errors.push("papeletas_anfora supera nro_votantes");
+  }
+
+  if (
+    payload.papeletas_anfora + payload.papeletas_no_utilizadas !==
+    payload.nro_votantes
+  ) {
+    errors.push("papeletas_anfora + papeletas_no_utilizadas no coincide con nro_votantes");
+  }
+
+  if (payload.votos.votos_validos !== payload.votos.votos_validos_calculados) {
+    errors.push("votos_validos no coincide con la suma de partidos");
+  }
+
+  if (payload.votos.total_votos !== payload.papeletas_anfora) {
+    errors.push("total_votos no coincide con papeletas_anfora");
+  }
+
+  if (
+    payload.nro_mesa_desde_acta !== undefined &&
+    payload.nro_mesa_desde_acta !== 0 &&
+    payload.nro_mesa !== payload.nro_mesa_desde_acta
+  ) {
+    errors.push("nro_mesa no coincide con el numero final del CodigoActa");
+  }
+
+  if (!payload.apertura) {
+    errors.push("apertura es obligatoria");
+  } else {
+    if (payload.apertura.hora < 0 || payload.apertura.hora > 23) {
+      errors.push("apertura.hora fuera de rango");
+    }
+
+    if (payload.apertura.minutos < 0 || payload.apertura.minutos > 59) {
+      errors.push("apertura.minutos fuera de rango");
+    }
+  }
+
+  if (!payload.cierre) {
+    errors.push("cierre es obligatorio");
+  } else {
+    if (payload.cierre.hora < 0 || payload.cierre.hora > 23) {
+      errors.push("cierre.hora fuera de rango");
+    }
+
+    if (payload.cierre.minutos < 0 || payload.cierre.minutos > 59) {
+      errors.push("cierre.minutos fuera de rango");
+    }
+  }
 
   return errors;
 }
 
-async function clearAndType(driver, id, value) {
-  const input = await driver.findElement(By.id(id));
-  await input.clear();
-  await input.sendKeys(value);
+async function clearAndTypeIfExists(driver, id, value) {
+  const elements = await driver.findElements(By.id(id));
+
+  if (elements.length === 0) {
+    return false;
+  }
+
+  const element = elements[0];
+
+  await driver.executeScript(
+    `
+    const el = arguments[0];
+    const value = arguments[1];
+
+    el.scrollIntoView({ block: "center", inline: "nearest" });
+
+    if (el.disabled) {
+      el.disabled = false;
+    }
+
+    if (el.readOnly) {
+      el.readOnly = false;
+    }
+
+    if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") {
+      el.value = value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      el.textContent = value;
+    }
+    `,
+    element,
+    String(value ?? "")
+  );
+
+  return true;
 }
 
-async function fillForm(driver, data) {
-  await clearAndType(driver, "nro_acta", data.nro_acta);
-  await clearAndType(driver, "codigo_territorial", data.codigo_territorial);
-  await clearAndType(driver, "codigo_mesa", data.codigo_mesa);
-  await clearAndType(driver, "nro_mesa", data.nro_mesa);
-  await clearAndType(driver, "nro_votantes", data.nro_votantes);
-  await clearAndType(driver, "registrado_por", data.registrado_por);
+async function setSelectValueIfExists(driver, id, value) {
+  const elements = await driver.findElements(By.id(id));
 
-  await clearAndType(driver, "partido1", data.partido1);
-  await clearAndType(driver, "partido2", data.partido2);
-  await clearAndType(driver, "partido3", data.partido3);
-  await clearAndType(driver, "partido4", data.partido4);
-  await clearAndType(driver, "votos_blancos", data.votos_blancos);
-  await clearAndType(driver, "votos_nulos", data.votos_nulos);
+  if (elements.length === 0) {
+    return false;
+  }
 
-  await driver.findElement(By.id("btn_registrar")).click();
+  const element = elements[0];
+
+  await driver.executeScript(
+    "arguments[0].scrollIntoView({ block: 'center', inline: 'nearest' });",
+    element
+  );
+
+  await element.sendKeys(String(value));
+
+  return true;
 }
 
-async function waitForResult(driver) {
-  const message = await driver.wait(until.elementLocated(By.id("message")), 5000);
+async function takeScreenshot(driver, filename) {
+  const image = await driver.takeScreenshot();
+  const screenshotPath = path.join(screenshotsDir, filename);
+  fs.writeFileSync(screenshotPath, image, "base64");
+  return screenshotPath;
+}
+
+async function fillForm(driver, payload) {
+  await clearAndTypeIfExists(driver, "nro_acta", payload.nro_acta);
+  await clearAndTypeIfExists(driver, "codigo_territorial", payload.codigo_territorial);
+  await clearAndTypeIfExists(driver, "codigo_recinto", payload.codigo_recinto);
+  await clearAndTypeIfExists(driver, "codigo_mesa", payload.codigo_mesa);
+  await clearAndTypeIfExists(driver, "nro_mesa", payload.nro_mesa);
+  await clearAndTypeIfExists(driver, "nro_votantes", payload.nro_votantes);
+  await clearAndTypeIfExists(driver, "registrado_por", payload.registrado_por);
+
+  await clearAndTypeIfExists(driver, "papeletas_anfora", payload.papeletas_anfora);
+  await clearAndTypeIfExists(driver, "papeletas_no_utilizadas", payload.papeletas_no_utilizadas);
+
+  await clearAndTypeIfExists(driver, "partido1", payload.votos.partido1);
+  await clearAndTypeIfExists(driver, "partido2", payload.votos.partido2);
+  await clearAndTypeIfExists(driver, "partido3", payload.votos.partido3);
+  await clearAndTypeIfExists(driver, "partido4", payload.votos.partido4);
+  await clearAndTypeIfExists(driver, "votos_blancos", payload.votos.votos_blancos);
+  await clearAndTypeIfExists(driver, "votos_nulos", payload.votos.votos_nulos);
+  await clearAndTypeIfExists(driver, "votos_validos", payload.votos.votos_validos);
+  await clearAndTypeIfExists(driver, "total_votos", payload.votos.total_votos);
+
+  await clearAndTypeIfExists(driver, "apertura_hora", payload.apertura?.hora);
+  await clearAndTypeIfExists(driver, "apertura_minutos", payload.apertura?.minutos);
+  await clearAndTypeIfExists(driver, "cierre_hora", payload.cierre?.hora);
+  await clearAndTypeIfExists(driver, "cierre_minutos", payload.cierre?.minutos);
+
+  await clearAndTypeIfExists(driver, "observaciones", payload.transcripcion);
+  await clearAndTypeIfExists(driver, "transcripcion", payload.transcripcion);
+  await clearAndTypeIfExists(driver, "tipo_observacion", payload.tipo_observacion);
+  await clearAndTypeIfExists(driver, "estado_acta", payload.estado_acta);
+
+  await setSelectValueIfExists(
+    driver,
+    "requiere_revision_humana",
+    payload.requiere_revision_humana ? "true" : "false"
+  );
+
+  const button = await driver.findElement(By.id("btn_registrar"));
+
+  await driver.executeScript(
+    `
+    const btn = arguments[0];
+    btn.scrollIntoView({ block: "center", inline: "nearest" });
+    btn.click();
+    `,
+    button
+  );
+}
+
+async function waitForMessage(driver) {
+  const messageElement = await driver.wait(
+    until.elementLocated(By.id("message")),
+    10000
+  );
+
   await driver.wait(async () => {
-    const text = await message.getText();
+    const text = await messageElement.getText();
     return text && text.trim().length > 0;
-  }, 5000);
+  }, 10000);
 
-  const text = await message.getText();
-  const className = await message.getAttribute("class");
+  const className = await messageElement.getAttribute("class");
+  const text = await messageElement.getText();
 
   return {
-    success: className.includes("success"),
-    message: text
+    className,
+    text
   };
 }
 
+function sameOfficialRecord(previous, current) {
+  return JSON.stringify(previous.payload) === JSON.stringify(current.payload);
+}
+
 async function main() {
-  if (!fs.existsSync(csvPath)) {
-    console.error(`No existe el CSV: ${csvPath}`);
+  resetReport(successReportPath);
+  resetReport(errorReportPath);
+  resetReport(observedReportPath);
+  resetReport(duplicateReportPath);
+
+  const filePath = path.resolve(__dirname, "..", "..", config.csvPath);
+
+  let rows = [];
+
+  try {
+    rows = await readOfficialFile(filePath);
+  } catch (error) {
+    console.error(error.message);
     process.exit(1);
   }
 
-  fs.writeFileSync(resultLogPath, "", "utf8");
-  fs.writeFileSync(errorLogPath, "", "utf8");
+  console.log(`Filas encontradas en archivo oficial: ${rows.length}`);
 
-//   const rows = await readCsv();
+  const limit = Number(config.seleniumLimit || rows.length);
+  const rowsToProcess = rows.slice(0, limit);
 
-//   console.log(`Filas encontradas para Selenium: ${rows.length}`);
-    const allRows = await readCsv();
-    const limit = Number(config.seleniumLimit || 0);
-    const rows = limit > 0 ? allRows.slice(0, limit) : allRows;
+  console.log(`Filas a procesar con Selenium: ${rowsToProcess.length}`);
 
-    console.log(`Filas encontradas en CSV: ${allRows.length}`);
-    console.log(`Filas a procesar con Selenium: ${rows.length}`);
+  const options = new chrome.Options();
+  options.addArguments("--start-maximized");
 
-  const driver = await new Builder().forBrowser("chrome").build();
+  const driver = await new Builder()
+    .forBrowser("chrome")
+    .setChromeOptions(options)
+    .build();
 
-  let total = 0;
-  let success = 0;
-  let failed = 0;
+  let exitosas = 0;
+  let fallidas = 0;
+  let observadas = 0;
+  let duplicadas = 0;
 
-  const startedAt = Date.now();
+  const actasProcesadas = new Map();
+  const startTime = Date.now();
 
   try {
-    await driver.get(FORM_URL);
+    await driver.get("http://localhost:3005");
+    await driver.wait(until.elementLocated(By.id("official-form")), 10000);
 
-    for (const row of rows) {
-      total++;
-
-      const data = buildRow(row);
-      const validationErrors = validateBeforeForm(data);
-
-      if (validationErrors.length > 0) {
-        failed++;
-
-        appendJsonLine(errorLogPath, {
-          rowNumber: total,
-          type: "VALIDATION_ERROR",
-          errors: validationErrors,
-          data
-        });
-
-        continue;
-      }
+    for (let index = 0; index < rowsToProcess.length; index++) {
+      const rowNumber = index + 2;
+      const rawRow = rowsToProcess[index];
 
       try {
-        await fillForm(driver, data);
-        const result = await waitForResult(driver);
+        const payload = buildOfficialPayload(
+          rawRow,
+          rowNumber,
+          config.defaultUserId || 1
+        );
 
-        if (result.success) {
-          success++;
+        if (actasProcesadas.has(payload.nro_acta)) {
+          const previous = actasProcesadas.get(payload.nro_acta);
+          duplicadas++;
+          fallidas++;
 
-          appendJsonLine(resultLogPath, {
-            rowNumber: total,
-            nro_acta: data.nro_acta,
-            message: result.message
+          writeJsonLine(duplicateReportPath, {
+            rowNumber,
+            type: "DUPLICATE_IN_EXCEL",
+            nro_acta: payload.nro_acta,
+            codigo_mesa: payload.codigo_mesa,
+            nro_mesa: payload.nro_mesa,
+            previous: {
+              rowNumber: previous.rowNumber,
+              payload: previous.payload
+            },
+            current: {
+              rowNumber,
+              payload
+            },
+            sameContent: sameOfficialRecord(previous, { rowNumber, payload }),
+            message: "Se detecto mas de una fila con el mismo CodigoActa. No se envia automaticamente al computo oficial."
           });
-        } else {
-          failed++;
 
-          appendJsonLine(errorLogPath, {
-            rowNumber: total,
-            type: "FORM_ERROR",
-            nro_acta: data.nro_acta,
-            message: result.message
+          writeJsonLine(errorReportPath, {
+            rowNumber,
+            type: "DUPLICATE_ERROR",
+            errors: ["CodigoActa duplicado en el Excel"],
+            data: rawRow,
+            payload
+          });
+
+          if (config.stopOnError) break;
+          continue;
+        }
+
+        actasProcesadas.set(payload.nro_acta, {
+          rowNumber,
+          payload
+        });
+
+        const validationErrors = validatePayload(payload);
+
+        if (payload.tipo_observacion !== "SIN_OBSERVACION") {
+          observadas++;
+
+          writeJsonLine(observedReportPath, {
+            rowNumber,
+            type: "ACTA_CON_OBSERVACION_EN_EXCEL",
+            nro_acta: payload.nro_acta,
+            codigo_territorial: payload.codigo_territorial,
+            codigo_recinto: payload.codigo_recinto,
+            codigo_mesa: payload.codigo_mesa,
+            nro_mesa: payload.nro_mesa,
+            nro_votantes: payload.nro_votantes,
+            papeletas_anfora: payload.papeletas_anfora,
+            papeletas_no_utilizadas: payload.papeletas_no_utilizadas,
+            votos: payload.votos,
+            transcripcion: payload.transcripcion,
+            tipo_observacion: payload.tipo_observacion,
+            estado_acta: payload.estado_acta,
+            requiere_revision_humana: payload.requiere_revision_humana,
+            rawRow
           });
         }
-      } catch (error) {
-        failed++;
 
-        appendJsonLine(errorLogPath, {
-          rowNumber: total,
-          type: "SELENIUM_ERROR",
-          nro_acta: data.nro_acta,
-          message: error.message
-        });
+        if (validationErrors.length > 0) {
+          fallidas++;
 
-        await driver.takeScreenshot().then((image) => {
-          const screenshotPath = path.resolve(
-            __dirname,
-            "..",
-            "screenshots",
-            `error_row_${total}.png`
+          writeJsonLine(errorReportPath, {
+            rowNumber,
+            type: "VALIDATION_ERROR",
+            errors: validationErrors,
+            data: rawRow,
+            payload
+          });
+
+          if (config.stopOnError) break;
+          continue;
+        }
+
+        await fillForm(driver, payload);
+
+        const result = await waitForMessage(driver);
+
+        if (result.className.includes("success")) {
+          exitosas++;
+
+          writeJsonLine(successReportPath, {
+            rowNumber,
+            message: result.text,
+            payload
+          });
+        } else {
+          fallidas++;
+
+          const screenshotPath = await takeScreenshot(
+            driver,
+            `error_fila_${rowNumber}.png`
           );
-          fs.writeFileSync(screenshotPath, image, "base64");
+
+          writeJsonLine(errorReportPath, {
+            rowNumber,
+            type: "FORM_ERROR",
+            message: result.text,
+            screenshotPath,
+            data: rawRow,
+            payload
+          });
+
+          if (config.stopOnError) break;
+        }
+      } catch (error) {
+        fallidas++;
+
+        const screenshotPath = await takeScreenshot(
+          driver,
+          `error_fila_${rowNumber}.png`
+        );
+
+        writeJsonLine(errorReportPath, {
+          rowNumber,
+          type: "SELENIUM_ERROR",
+          message: error.message,
+          screenshotPath,
+          data: rawRow
         });
+
+        if (config.stopOnError) break;
       }
     }
   } finally {
-    const finishedAt = Date.now();
-    const elapsedSeconds = ((finishedAt - startedAt) / 1000).toFixed(2);
-
-    console.log("Carga visual Selenium finalizada");
-    console.log(`Total procesadas: ${total}`);
-    console.log(`Exitosas: ${success}`);
-    console.log(`Fallidas: ${failed}`);
-    console.log(`Tiempo total: ${elapsedSeconds} segundos`);
-
     await driver.quit();
   }
+
+  const totalTimeSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
+
+  console.log("Carga visual Selenium finalizada");
+  console.log(`Total procesadas: ${rowsToProcess.length}`);
+  console.log(`Exitosas: ${exitosas}`);
+  console.log(`Fallidas: ${fallidas}`);
+  console.log(`Actas observadas: ${observadas}`);
+  console.log(`Actas duplicadas: ${duplicadas}`);
+  console.log(`Tiempo total: ${totalTimeSeconds} segundos`);
+  console.log(`Log exitosas: ${successReportPath}`);
+  console.log(`Log errores: ${errorReportPath}`);
+  console.log(`Log observadas: ${observedReportPath}`);
+  console.log(`Log duplicadas: ${duplicateReportPath}`);
 }
 
 main();

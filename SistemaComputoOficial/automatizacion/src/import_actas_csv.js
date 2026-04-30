@@ -1,103 +1,104 @@
 const fs = require("fs");
 const path = require("path");
-const csv = require("csv-parser");
+const { readOfficialFile } = require("./read_official_file");
+const { buildOfficialPayload } = require("./official_csv_adapter");
 
-const configPath = path.join(__dirname, "..", "config", "automation.config.json");
-const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const config = require("../config/automation.config.json");
 
-const csvPath = path.resolve(__dirname, "..", config.csvPath);
-const successLogPath = path.resolve(__dirname, "..", "logs", "carga_exitosa.jsonl");
-const errorLogPath = path.resolve(__dirname, "..", "logs", "carga_errores.jsonl");
+const logsDir = path.join(__dirname, "..", "logs");
+const successLogPath = path.join(logsDir, "carga_exitosa.jsonl");
+const errorLogPath = path.join(logsDir, "carga_errores.jsonl");
+const observedLogPath = path.join(logsDir, "actas_observadas.jsonl");
+const duplicatedLogPath = path.join(logsDir, "actas_duplicadas.jsonl");
 
-function toNumber(value) {
-  const numberValue = Number(value);
-  return Number.isNaN(numberValue) ? 0 : numberValue;
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
 }
 
-function buildPayload(row) {
-  const partido1 = toNumber(row.partido1);
-  const partido2 = toNumber(row.partido2);
-  const partido3 = toNumber(row.partido3);
-  const partido4 = toNumber(row.partido4);
-  const votosBlancos = toNumber(row.votos_blancos);
-  const votosNulos = toNumber(row.votos_nulos);
-  const nroVotantes = toNumber(row.nro_votantes || row.NroVotantes);
+function writeJsonLine(filePath, data) {
+  fs.appendFileSync(filePath, `${JSON.stringify(data)}\n`, "utf8");
+}
 
-  const votosValidos = partido1 + partido2 + partido3 + partido4;
-  const totalVotos = votosValidos + votosBlancos + votosNulos;
-
-  return {
-    nro_acta: row.nro_acta,
-    codigo_territorial: toNumber(row.codigo_territorial || row.CodigoTerritorial),
-    codigo_mesa: toNumber(row.codigo_mesa || row.CodigoMesa),
-    nro_mesa: toNumber(row.nro_mesa || row.Mesa),
-    nro_votantes: nroVotantes,
-    votos: {
-      partido1,
-      partido2,
-      partido3,
-      partido4,
-      votos_blancos: votosBlancos,
-      votos_nulos: votosNulos,
-      votos_validos: votosValidos,
-      total_votos: totalVotos
-    },
-    registrado_por: toNumber(row.registrado_por || config.defaultUserId),
-    origen: "CARGA_MASIVA_AUTOMATIZADA"
-  };
+function isEmpty(value) {
+  return value === undefined || value === null || value === "";
 }
 
 function validatePayload(payload) {
   const errors = [];
 
-  if (!payload.nro_acta) errors.push("nro_acta vacío");
-  if (!payload.codigo_mesa) errors.push("codigo_mesa vacío");
-  if (!payload.codigo_territorial) errors.push("codigo_territorial vacío");
-  if (!payload.nro_mesa) errors.push("nro_mesa vacío");
+  if (isEmpty(payload.nro_acta)) errors.push("nro_acta es obligatorio");
+  if (isEmpty(payload.codigo_mesa)) errors.push("codigo_mesa es obligatorio");
+  if (isEmpty(payload.nro_mesa)) errors.push("nro_mesa es obligatorio");
+  if (isEmpty(payload.nro_votantes)) errors.push("nro_votantes es obligatorio");
 
-  if (payload.nro_votantes < 0) errors.push("nro_votantes inválido");
+  if (payload.nro_votantes <= 0) {
+    errors.push("nro_votantes debe ser mayor a 0");
+  }
 
-  for (const [field, value] of Object.entries(payload.votos)) {
+  if (payload.papeletas_anfora < 0) {
+    errors.push("papeletas_anfora no puede ser negativo");
+  }
+
+  if (payload.papeletas_no_utilizadas < 0) {
+    errors.push("papeletas_no_utilizadas no puede ser negativo");
+  }
+
+  const voteFields = [
+    ["partido1", payload.votos.partido1],
+    ["partido2", payload.votos.partido2],
+    ["partido3", payload.votos.partido3],
+    ["partido4", payload.votos.partido4],
+    ["votos_blancos", payload.votos.votos_blancos],
+    ["votos_nulos", payload.votos.votos_nulos],
+    ["votos_validos", payload.votos.votos_validos]
+  ];
+
+  for (const [field, value] of voteFields) {
     if (value < 0) {
       errors.push(`${field} no puede ser negativo`);
     }
   }
 
-  const sumaPartidos =
-    payload.votos.partido1 +
-    payload.votos.partido2 +
-    payload.votos.partido3 +
-    payload.votos.partido4;
-
-  if (payload.votos.votos_validos !== sumaPartidos) {
-    errors.push("Inconsistencia aritmética en votos_validos");
+  if (payload.votos.votos_validos !== payload.votos.votos_validos_calculados) {
+    errors.push("votos_validos no coincide con la suma de P1+P2+P3+P4");
   }
 
-  const totalCalculado =
-    payload.votos.votos_validos +
-    payload.votos.votos_blancos +
-    payload.votos.votos_nulos;
+  if (payload.votos.total_votos !== payload.papeletas_anfora) {
+    errors.push("total_votos no coincide con papeletas_anfora");
+  }
 
-  if (payload.votos.total_votos !== totalCalculado) {
-    errors.push("Inconsistencia aritmética en total_votos");
+  if (payload.papeletas_anfora + payload.papeletas_no_utilizadas !== payload.nro_votantes) {
+    errors.push("papeletas_anfora + papeletas_no_utilizadas no coincide con nro_votantes");
   }
 
   if (payload.votos.total_votos > payload.nro_votantes) {
     errors.push("total_votos supera nro_votantes");
   }
 
+  if (payload.apertura.hora < 0 || payload.apertura.hora > 23) {
+    errors.push("apertura.hora fuera de rango");
+  }
+
+  if (payload.apertura.minutos < 0 || payload.apertura.minutos > 59) {
+    errors.push("apertura.minutos fuera de rango");
+  }
+
+  if (payload.cierre.hora < 0 || payload.cierre.hora > 23) {
+    errors.push("cierre.hora fuera de rango");
+  }
+
+  if (payload.cierre.minutos < 0 || payload.cierre.minutos > 59) {
+    errors.push("cierre.minutos fuera de rango");
+  }
+
   return errors;
 }
 
-function appendJsonLine(filePath, data) {
-  fs.appendFileSync(filePath, `${JSON.stringify(data)}\n`, "utf8");
+function sameOfficialRecord(previous, current) {
+  return JSON.stringify(previous.payload) === JSON.stringify(current.payload);
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function sendToBackend(payload) {
+async function sendPayload(payload) {
   const response = await fetch(config.apiUrl, {
     method: "POST",
     headers: {
@@ -115,106 +116,178 @@ async function sendToBackend(payload) {
   };
 }
 
-async function processRows(rows) {
-  let total = 0;
-  let success = 0;
-  let failed = 0;
+async function delay(ms) {
+  if (!ms || ms <= 0) return;
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  for (const row of rows) {
-    total++;
+async function main() {
+  const filePath = path.resolve(__dirname, "..", config.csvPath);
 
-    const payload = buildPayload(row);
-    const validationErrors = validatePayload(payload);
+  console.log(`Leyendo archivo oficial: ${filePath}`);
 
-    if (validationErrors.length > 0) {
-      failed++;
+  let rows = [];
 
-      appendJsonLine(errorLogPath, {
-        type: "VALIDATION_ERROR",
-        rowNumber: total,
-        errors: validationErrors,
-        payload
-      });
+  try {
+    rows = await readOfficialFile(filePath);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
 
-      if (config.stopOnError) break;
-      continue;
-    }
+  console.log(`Filas encontradas: ${rows.length}`);
+
+  let exitosas = 0;
+  let fallidas = 0;
+  let observadas = 0;
+  let duplicadas = 0;
+
+  const actasVistas = new Map();
+
+  for (let index = 0; index < rows.length; index++) {
+    const rowNumber = index + 2;
+    const rawRow = rows[index];
 
     try {
-      const result = await sendToBackend(payload);
+      const payload = buildOfficialPayload(
+        rawRow,
+        rowNumber,
+        config.defaultUserId || 1
+      );
 
-      if (result.ok) {
-        success++;
+      const duplicateKey = payload.nro_acta;
 
-        appendJsonLine(successLogPath, {
-          rowNumber: total,
-          status: result.status,
-          response: result.data,
-          payload
+      if (actasVistas.has(duplicateKey)) {
+        const previous = actasVistas.get(duplicateKey);
+        duplicadas++;
+        fallidas++;
+
+        writeJsonLine(duplicatedLogPath, {
+          type: "ACTA_DUPLICADA_EN_EXCEL",
+          nro_acta: payload.nro_acta,
+          codigo_mesa: payload.codigo_mesa,
+          nro_mesa: payload.nro_mesa,
+          previous: {
+            rowNumber: previous.rowNumber,
+            payload: previous.payload
+          },
+          current: {
+            rowNumber,
+            payload
+          },
+          sameContent: sameOfficialRecord(previous, { rowNumber, payload }),
+          message: "Se detecto mas de una fila con el mismo CodigoActa. No se envia automaticamente al computo oficial."
         });
-      } else {
-        failed++;
 
-        appendJsonLine(errorLogPath, {
-          type: "HTTP_ERROR",
-          rowNumber: total,
-          status: result.status,
-          response: result.data,
+        writeJsonLine(errorLogPath, {
+          rowNumber,
+          type: "DUPLICATE_ERROR",
+          errors: ["CodigoActa duplicado en el Excel"],
+          data: rawRow,
           payload
         });
 
         if (config.stopOnError) break;
+        continue;
       }
-    } catch (error) {
-      failed++;
 
-      appendJsonLine(errorLogPath, {
-        type: "CONNECTION_ERROR",
-        rowNumber: total,
-        message: error.message,
+      actasVistas.set(duplicateKey, {
+        rowNumber,
         payload
+      });
+
+      const validationErrors = validatePayload(payload);
+
+      if (payload.tipo_observacion !== "SIN_OBSERVACION") {
+        observadas++;
+
+        writeJsonLine(observedLogPath, {
+          rowNumber,
+          nro_acta: payload.nro_acta,
+          codigo_territorial: payload.codigo_territorial,
+          codigo_recinto: payload.codigo_recinto,
+          codigo_mesa: payload.codigo_mesa,
+          nro_mesa: payload.nro_mesa,
+          nro_votantes: payload.nro_votantes,
+          papeletas_anfora: payload.papeletas_anfora,
+          papeletas_no_utilizadas: payload.papeletas_no_utilizadas,
+          votos: payload.votos,
+          transcripcion: payload.transcripcion,
+          tipo_observacion: payload.tipo_observacion,
+          estado_acta: payload.estado_acta,
+          requiere_revision_humana: payload.requiere_revision_humana,
+          rawRow,
+          type: "ACTA_CON_OBSERVACION_EN_EXCEL"
+        });
+      }
+
+      if (validationErrors.length > 0) {
+        fallidas++;
+
+        writeJsonLine(errorLogPath, {
+          rowNumber,
+          type: "VALIDATION_ERROR",
+          errors: validationErrors,
+          data: rawRow,
+          payload
+        });
+
+        if (config.stopOnError) break;
+        continue;
+      }
+
+      const result = await sendPayload(payload);
+
+      if (!result.ok) {
+        fallidas++;
+
+        writeJsonLine(errorLogPath, {
+          rowNumber,
+          type: "API_ERROR",
+          status: result.status,
+          response: result.data,
+          data: rawRow,
+          payload
+        });
+
+        if (config.stopOnError) break;
+        continue;
+      }
+
+      exitosas++;
+
+      writeJsonLine(successLogPath, {
+        rowNumber,
+        status: result.status,
+        response: result.data,
+        payload
+      });
+
+      await delay(config.batchDelayMs);
+    } catch (error) {
+      fallidas++;
+
+      writeJsonLine(errorLogPath, {
+        rowNumber,
+        type: "UNEXPECTED_ERROR",
+        message: error.message,
+        data: rawRow
       });
 
       if (config.stopOnError) break;
     }
-
-    if (config.batchDelayMs > 0) {
-      await delay(config.batchDelayMs);
-    }
   }
 
   console.log("Carga finalizada");
-  console.log(`Total procesadas: ${total}`);
-  console.log(`Exitosas: ${success}`);
-  console.log(`Fallidas: ${failed}`);
-}
-
-function readCsv() {
-  return new Promise((resolve, reject) => {
-    const rows = [];
-
-    fs.createReadStream(csvPath)
-      .pipe(csv())
-      .on("data", (row) => rows.push(row))
-      .on("end", () => resolve(rows))
-      .on("error", reject);
-  });
-}
-
-async function main() {
-  if (!fs.existsSync(csvPath)) {
-    console.error(`No existe el archivo CSV: ${csvPath}`);
-    process.exit(1);
-  }
-
-  fs.writeFileSync(successLogPath, "", "utf8");
-  fs.writeFileSync(errorLogPath, "", "utf8");
-
-  console.log(`Leyendo CSV: ${csvPath}`);
-  const rows = await readCsv();
-
-  console.log(`Filas encontradas: ${rows.length}`);
-  await processRows(rows);
+  console.log(`Total procesadas: ${rows.length}`);
+  console.log(`Exitosas: ${exitosas}`);
+  console.log(`Fallidas: ${fallidas}`);
+  console.log(`Actas observadas: ${observadas}`);
+  console.log(`Actas duplicadas: ${duplicadas}`);
+  console.log(`Log exitosas: ${successLogPath}`);
+  console.log(`Log errores: ${errorLogPath}`);
+  console.log(`Log observadas: ${observedLogPath}`);
+  console.log(`Log duplicadas: ${duplicatedLogPath}`);
 }
 
 main();

@@ -1,5 +1,5 @@
 {
-  "csvPath": "./data/actas_oficiales_transcripcion_3000_mixto.csv",
+  "csvPath": "./data/oficial/actas_conteo.xlsx",
   "apiUrl": "http://localhost:4000/api/oficial/actas",
   "defaultUserId": 1,
   "batchDelayMs": 0,

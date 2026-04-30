@@ -1,20 +1,22 @@
 {
   "name": "automatizacion-computo-oficial",
   "version": "1.0.0",
-  "description": "Automatización de carga masiva de actas oficiales desde CSV mediante API, n8n o Selenium",
+  "description": "Automatizacion de carga masiva de actas oficiales desde CSV mediante API, n8n o Selenium",
   "main": "src/import_actas_csv.js",
-"scripts": {
-  "mock": "node src/mock_backend_oficial.js",
-  "import": "node src/import_actas_csv.js",
-  "web": "node web-form/src/server.js",
-  "selenium": "node selenium/src/selenium_import_actas.js",
-  "generate:massive-csv": "node src/generate_massive_csv.js",
-  "generate:massive-csv:mixed": "node src/generate_massive_csv_mixed.js"
+  "scripts": {
+    "mock": "node src/mock_backend_oficial.js",
+    "import": "node src/import_actas_csv.js",
+    "web": "node web-form/src/server.js",
+    "selenium": "node selenium/src/selenium_import_actas.js",
+    "debug:excel": "node src/debug_excel_headers.js",
+    "generate:massive-csv": "node src/generate_massive_csv.js",
+    "generate:massive-csv:mixed": "node src/generate_massive_csv_mixed.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "csv-parser": "^3.0.0",
     "express": "^4.18.3",
-    "selenium-webdriver": "^4.18.1"
+    "selenium-webdriver": "^4.18.1",
+    "xlsx": "^0.18.5"
   }
 }
