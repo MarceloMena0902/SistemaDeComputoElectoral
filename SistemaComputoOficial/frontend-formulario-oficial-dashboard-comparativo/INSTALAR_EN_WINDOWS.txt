@@ -1,0 +1,27 @@
+INSTALACION RAPIDA - FORMULARIO OFICIAL Y DASHBOARD COMPARATIVO
+
+Ubicacion correcta en el repositorio:
+SistemaComputoOficial\frontend-formulario-oficial-dashboard-comparativo
+
+Comandos:
+
+cd SistemaComputoOficial\frontend-formulario-oficial-dashboard-comparativo
+npm install
+npm run dev
+
+Abrir:
+http://localhost:5173
+
+Si hay backend oficial disponible:
+1. Crear archivo .env desde .env.example
+2. Configurar:
+   VITE_OFICIAL_API_URL=http://localhost:4000
+3. Ejecutar npm run dev
+4. No hay checkbox visible de backend. Para enviar al servicio oficial, configurar VITE_ENABLE_API_SUBMIT=true en .env.
+
+Este modulo no levanta MongoDB ni PostgreSQL. Usa los servicios del equipo.
+
+
+VALIDACIONES REFORZADAS
+-----------------------
+El formulario no permite guardar actas con errores criticos. Los campos numericos se escriben como texto numerico controlado para evitar letras, decimales, signos negativos o notacion cientifica. Si el acta contiene errores, queda bloqueada hasta corregirlos.
