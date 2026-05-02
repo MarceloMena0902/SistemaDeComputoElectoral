@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Formulario Oficial de Actas</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <div class="header">
+        <h1>Registro Oficial de Actas</h1>
+        <p>Cómputo Oficial - Automatización visual con Selenium</p>
+      </div>
+
+      <form id="official-form">
+        <h2>Datos generales del acta</h2>
+
+        <div class="grid">
+          <label>
+            Nro. Acta / Código Acta
+            <input id="nro_acta" name="nro_acta" type="text" required />
+          </label>
+
+          <label>
+            Código Territorial
+            <input id="codigo_territorial" name="codigo_territorial" type="number" required />
+          </label>
+
+          <label>
+            Código Recinto
+            <input id="codigo_recinto" name="codigo_recinto" type="text" />
+          </label>
+
+          <label>
+            Código Mesa
+            <input id="codigo_mesa" name="codigo_mesa" type="number" required />
+          </label>
+
+          <label>
+            Nro. Mesa
+            <input id="nro_mesa" name="nro_mesa" type="number" required />
+          </label>
+
+          <label>
+            Votantes Habilitados
+            <input id="nro_votantes" name="nro_votantes" type="number" min="0" required />
+          </label>
+
+          <label>
+            Papeletas en Ánfora
+            <input id="papeletas_anfora" name="papeletas_anfora" type="number" min="0" required />
+          </label>
+
+          <label>
+            Papeletas No Utilizadas
+            <input id="papeletas_no_utilizadas" name="papeletas_no_utilizadas" type="number" min="0" required />
+          </label>
+
+          <label>
+            Registrado por
+            <input id="registrado_por" name="registrado_por" type="number" value="1" required />
+          </label>
+        </div>
+
+        <h2>Votos por partido</h2>
+
+        <div class="grid">
+          <label>
+            Partido 1
+            <input id="partido1" name="partido1" type="number" required />
+          </label>
+
+          <label>
+            Partido 2
+            <input id="partido2" name="partido2" type="number" required />
+          </label>
+
+          <label>
+            Partido 3
+            <input id="partido3" name="partido3" type="number" required />
+          </label>
+
+          <label>
+            Partido 4
+            <input id="partido4" name="partido4" type="number" required />
+          </label>
+
+          <label>
+            Votos Blancos
+            <input id="votos_blancos" name="votos_blancos" type="number" min="0" required />
+          </label>
+
+          <label>
+            Votos Nulos
+            <input id="votos_nulos" name="votos_nulos" type="number" min="0" required />
+          </label>
+
+          <label>
+            Votos Válidos
+            <input id="votos_validos" name="votos_validos" type="number" min="0" required />
+          </label>
+
+          <label>
+            Total Votos
+            <input id="total_votos" name="total_votos" type="number" min="0" required />
+          </label>
+        </div>
+
+        <h2>Horarios del acta</h2>
+
+        <div class="grid">
+          <label>
+            Apertura Hora
+            <input id="apertura_hora" name="apertura_hora" type="number" min="0" max="23" required />
+          </label>
+
+          <label>
+            Apertura Minutos
+            <input id="apertura_minutos" name="apertura_minutos" type="number" min="0" max="59" required />
+          </label>
+
+          <label>
+            Cierre Hora
+            <input id="cierre_hora" name="cierre_hora" type="number" min="0" max="23" required />
+          </label>
+
+          <label>
+            Cierre Minutos
+            <input id="cierre_minutos" name="cierre_minutos" type="number" min="0" max="59" required />
+          </label>
+        </div>
+
+        <h2>Observaciones y estado</h2>
+
+        <div class="grid">
+          <label>
+            Tipo Observación
+            <input id="tipo_observacion" name="tipo_observacion" type="text" value="SIN_OBSERVACION" />
+          </label>
+
+          <label>
+            Estado Acta
+            <input id="estado_acta" name="estado_acta" type="text" value="VALIDA" />
+          </label>
+
+          <label>
+            Requiere Revisión Humana
+            <select id="requiere_revision_humana" name="requiere_revision_humana">
+              <option value="false">No</option>
+              <option value="true">Sí</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="full">
+          Observaciones / Transcripción
+          <textarea id="observaciones" name="observaciones" rows="4"></textarea>
+        </label>
+
+        <textarea id="transcripcion" name="transcripcion" rows="4" style="display:none;"></textarea>
+
+        <div class="summary">
+          <p><strong>Votos válidos calculados:</strong> <span id="votos_validos_preview">0</span></p>
+          <p><strong>Total votos calculado:</strong> <span id="total_votos_preview">0</span></p>
+          <p><strong>Control papeletas:</strong> <span id="control_papeletas_preview">0</span></p>
+        </div>
+
+        <button id="btn_registrar" type="submit">Registrar acta oficial</button>
+
+        <div id="message" class="message"></div>
+      </form>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

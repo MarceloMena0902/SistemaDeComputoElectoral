@@ -383,3 +383,24 @@ También se agregó control anti doble carga:
 - Si existen errores críticos, se muestra el detalle y no se registra el acta como válida.
 
 Esto es solo del frontend de Formulario Oficial y Dashboard Comparativo; la persistencia real depende del backend oficial configurado por `.env`.
+
+
+## Integración final backend Marcelo + dashboard comparativo
+
+Este paquete une los cambios del backend oficial de Marcelo con el frontend del Formulario Oficial y Dashboard Comparativo.
+
+Incluye:
+- Backend oficial en `SistemaComputoOficial/Backend`.
+- Automatización en `SistemaComputoOficial/automatizacion`.
+- PostgreSQL, HAProxy y `docker-compose.yml`.
+- Frontend con endpoints conectados a `http://localhost:4000`.
+- Formulario con combos dependientes, bloqueo anti doble carga y modal de validación.
+- Dashboard comparativo con métricas reales si el backend está activo y mock/local si no lo está.
+- Pantalla de Automatización para iniciar carga masiva y revisar progreso/runs.
+
+Variables importantes del frontend:
+```env
+VITE_OFICIAL_API_URL=http://localhost:4000
+VITE_ENABLE_API_SUBMIT=true
+VITE_RRV_API_URL=
+```

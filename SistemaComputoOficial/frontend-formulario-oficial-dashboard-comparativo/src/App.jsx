@@ -1,7 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { oficialActas as officialSeed } from './data/oficial.mock.js';
-import { rrvActas } from './data/rrv.mock.js';
-import { ENABLE_API_SUBMIT, apiInfo, getAuditoriaOficial, getProgresoOficial, getResultadosOficiales, healthOficial, registrarActaOficial } from './services/api.js';
+import { rrvActas as rrvMock } from './data/rrv.mock.js';
+import {
+  ENABLE_API_SUBMIT,
+  RRV_ENABLED,
+  apiInfo,
+  getAuditoriaOficial,
+  getActasOficiales,
+  getMetricasDashboard,
+  getProgresoAutomatizacion,
+  getProgresoOficial,
+  getResultadosOficiales,
+  getRunsAutomatizacion,
+  getRrvActas,
+  healthOficial,
+  iniciarAutomatizacion,
+  registrarActaOficial,
+} from './services/api.js';
 import {
   PARTIES,
   buildInconsistencias,
@@ -21,12 +36,13 @@ import {
 const STORAGE_KEY = 'computo_oficial_dashboard_frontend_v1';
 
 const NAV = [
-  { id: 'dashboard', icon: '✦', label: 'Dashboard comparativo' },
-  { id: 'formulario', icon: '▣', label: 'Formulario oficial' },
-  { id: 'actas', icon: '☷', label: 'Actas oficiales' },
-  { id: 'inconsistencias', icon: '◇', label: 'Inconsistencias' },
-  { id: 'auditoria', icon: '⌁', label: 'Auditoría' },
-  { id: 'integracion', icon: '⎇', label: 'Integración técnica' },
+  { id: 'dashboard',      icon: '✦', label: 'Dashboard comparativo' },
+  { id: 'formulario',     icon: '▣', label: 'Formulario oficial' },
+  { id: 'automatizacion', icon: '⚡', label: 'Automatización' },
+  { id: 'actas',          icon: '☷', label: 'Actas oficiales' },
+  { id: 'inconsistencias',icon: '◇', label: 'Inconsistencias' },
+  { id: 'auditoria',      icon: '⌁', label: 'Auditoría' },
+  { id: 'integracion',    icon: '⎇', label: 'Integración técnica' },
 ];
 
 function loadCustomActas() {
@@ -36,14 +52,19 @@ function loadCustomActas() {
 export default function App() {
   const [active, setActive] = useState('dashboard');
   const [customActas, setCustomActas] = useState(loadCustomActas);
+  const [backendActas, setBackendActas] = useState([]);
+  const [backendLoaded, setBackendLoaded] = useState(false);
   const [backendStatus, setBackendStatus] = useState({ checked: false, ok: false, label: 'sin comprobar' });
+  const [rrvActas, setRrvActas] = useState(rrvMock);
+  const [rrvStatus, setRrvStatus] = useState({ loaded: false, ok: false, label: RRV_ENABLED ? 'conectando...' : 'mock' });
 
   const oficialActas = useMemo(() => {
+    const base = backendLoaded && backendActas.length > 0 ? backendActas : officialSeed;
     const customMap = new Map(customActas.map((a) => [String(a.codigoActa), a]));
-    const merged = officialSeed.map((a) => customMap.get(String(a.codigoActa)) || a);
-    const extras = customActas.filter((a) => !officialSeed.some((s) => String(s.codigoActa) === String(a.codigoActa)));
+    const merged = base.map((a) => customMap.get(String(a.codigoActa)) || a);
+    const extras = customActas.filter((a) => !base.some((s) => String(s.codigoActa) === String(a.codigoActa)));
     return [...extras, ...merged];
-  }, [customActas]);
+  }, [customActas, backendActas, backendLoaded]);
 
   const saveCustomActa = (acta) => {
     setCustomActas((prev) => {
@@ -53,25 +74,62 @@ export default function App() {
     });
   };
 
-  const checkBackend = async () => {
+  const checkBackend = useCallback(async () => {
     setBackendStatus({ checked: true, ok: false, label: 'comprobando...' });
     try {
       const res = await healthOficial();
       setBackendStatus({ checked: true, ok: true, label: res?.service || 'backend oficial disponible' });
-    } catch (e) {
+    } catch {
       setBackendStatus({ checked: true, ok: false, label: 'backend oficial no disponible' });
     }
-  };
+  }, []);
 
-  useEffect(() => { checkBackend(); }, []);
+  const fetchBackendActas = useCallback(async () => {
+    try {
+      const data = await getActasOficiales({ limit: 1000 });
+      setBackendActas(data.items || []);
+      setBackendLoaded(true);
+    } catch {
+      setBackendLoaded(false);
+    }
+  }, []);
+
+  const fetchRrvActas = useCallback(async () => {
+    if (!RRV_ENABLED) return;
+    setRrvStatus({ loaded: false, ok: false, label: 'conectando...' });
+    try {
+      const data = await getRrvActas(1000);
+      if (data.actas.length > 0) {
+        setRrvActas(data.actas);
+        setRrvStatus({ loaded: true, ok: true, label: `${data.actas.length} actas RRV reales` });
+      } else {
+        setRrvStatus({ loaded: true, ok: true, label: 'RRV vacío — usando mock' });
+      }
+    } catch (e) {
+      setRrvStatus({ loaded: true, ok: false, label: `Error RRV: ${e.message}` });
+    }
+  }, []);
+
+  useEffect(() => {
+    checkBackend().then(() => {});
+  }, [checkBackend]);
+
+  useEffect(() => {
+    if (backendStatus.ok) fetchBackendActas();
+  }, [backendStatus.ok, fetchBackendActas]);
+
+  useEffect(() => {
+    fetchRrvActas();
+  }, [fetchRrvActas]);
 
   const page = {
-    dashboard: <Dashboard oficial={oficialActas} />,
-    formulario: <Formulario oficial={oficialActas} onSave={saveCustomActa} backendStatus={backendStatus} onCheckBackend={checkBackend} />,
-    actas: <ActasPage oficial={oficialActas} />,
-    inconsistencias: <InconsistenciasPage oficial={oficialActas} />,
-    auditoria: <AuditoriaPage oficial={oficialActas} backendStatus={backendStatus} />,
-    integracion: <IntegracionPage backendStatus={backendStatus} onCheckBackend={checkBackend} />,
+    dashboard:       <Dashboard oficial={oficialActas} rrv={rrvActas} />,
+    formulario:      <Formulario oficial={oficialActas} onSave={saveCustomActa} backendStatus={backendStatus} onCheckBackend={checkBackend} />,
+    automatizacion:  <AutomatizacionPage backendStatus={backendStatus} onRefreshActas={fetchBackendActas} />,
+    actas:           <ActasPage oficial={oficialActas} backendLoaded={backendLoaded} onRefresh={fetchBackendActas} />,
+    inconsistencias: <InconsistenciasPage oficial={oficialActas} rrv={rrvActas} />,
+    auditoria:       <AuditoriaPage oficial={oficialActas} backendStatus={backendStatus} />,
+    integracion:     <IntegracionPage backendStatus={backendStatus} rrvStatus={rrvStatus} onCheckBackend={checkBackend} onRefreshRrv={fetchRrvActas} />,
   }[active];
 
   return (
@@ -93,14 +151,13 @@ export default function App() {
         </nav>
         <div className="sideStatus">
           <small>Estado de integración</small>
-          <div className="statusLine"><i className={backendStatus.ok ? 'dot ok' : 'dot warn'} /> Servicio oficial: {backendStatus.ok ? 'conectado' : 'modo demostración'}</div>
-          <div className="statusLine"><i className="dot info" /> RRV: datos demo hasta endpoint real</div>
+          <div className="statusLine"><i className={backendStatus.ok ? 'dot ok' : 'dot warn'} /> Oficial: {backendStatus.ok ? 'conectado' : 'modo demo'}</div>
+          <div className="statusLine"><i className={backendLoaded ? 'dot ok' : 'dot info'} /> Actas: {backendLoaded ? `${backendActas.length} cargadas` : 'mock/local'}</div>
+          <div className="statusLine"><i className={rrvStatus.ok ? 'dot ok' : RRV_ENABLED ? 'dot warn' : 'dot info'} /> RRV: {rrvStatus.label}</div>
           <button className="miniButton" onClick={checkBackend}>Comprobar backend</button>
         </div>
       </aside>
-      <main className="mainContent">
-        {page}
-      </main>
+      <main className="mainContent">{page}</main>
     </div>
   );
 }
@@ -255,10 +312,11 @@ function TerritoryResultsTable({ rows }) {
   </div>;
 }
 
-function Dashboard({ oficial }) {
+function Dashboard({ oficial, rrv = [] }) {
   const [filters, setFilters] = useState({ proceso: 'Elecciones Subnacionales 2026', departamento: '', provincia: '', municipio: '', recinto: '', mesa: '', estado: '', fuente: '', q: '' });
+  const [metricas, setMetricas] = useState(null);
   const oficialF = useMemo(() => filterActas(oficial, filters), [oficial, filters]);
-  const rrvF = useMemo(() => filterActas(rrvActas, filters), [filters]);
+  const rrvF = useMemo(() => filterActas(rrv, filters), [rrv, filters]);
   const kpis = useMemo(() => buildKpis(oficialF, rrvF), [oficialF, rrvF]);
   const compare = useMemo(() => compareParties(oficialF, rrvF), [oficialF, rrvF]);
   const deps = useMemo(() => departmentSummary(oficialF, rrvF), [oficialF, rrvF]);
@@ -267,16 +325,42 @@ function Dashboard({ oficial }) {
   const source = useMemo(() => sourceSummary(rrvF), [rrvF]);
   const technical = useMemo(() => technicalSummary(oficialF, rrvF), [oficialF, rrvF]);
 
+  useEffect(() => {
+    getMetricasDashboard().then(setMetricas).catch(() => {});
+  }, [oficial.length]);
+
+  const avanceReal = clamp(metricas?.porcentaje_avance ?? kpis.avance ?? 0, 0, 100);
+
   return (
     <>
-      <PageHeader eyebrow="Dashboard analítico" title="RRV vs Cómputo Oficial" subtitle="Vista comparativa para detectar diferencias entre MongoDB RRV y PostgreSQL oficial.">
+      <PageHeader eyebrow="Dashboard analítico" title="RRV vs Cómputo Oficial" subtitle="Vista comparativa para detectar diferencias entre MongoDB RRV y PostgreSQL oficial, con métricas reales si el backend está activo.">
         <button className="primary" onClick={() => exportJson('comparativo-rrv-vs-oficial.json', { kpis, compare, technical, inconsistencias: inconsistencias.slice(0, 80) })}>Exportar JSON</button>
       </PageHeader>
-      <Filters filters={filters} setFilters={setFilters} data={[...oficial, ...rrvActas]} title="Filtro territorial y de actas" />
+      <Filters filters={filters} setFilters={setFilters} data={[...oficial, ...rrv]} title="Filtro territorial y de actas" />
+      {metricas && (
+        <section className="oepProgressGrid">
+          <Card className="progressHero">
+            <div><p className="eyebrow">KPIs en tiempo real (PostgreSQL)</p><h2>{avanceReal.toFixed(2)}% de actas procesadas</h2></div>
+            <div className="progressRail"><span style={{ width: `${avanceReal}%` }} /></div>
+            <div className="progressMini">
+              <span><b>{fmt(metricas.total_actas ?? kpis.actasOficial)}</b> Oficiales</span>
+              <span><b>{fmt(kpis.actasRRV)}</b> RRV</span>
+              <span><b>{fmt(kpis.actasObservadas)}</b> Observadas</span>
+              <span><b>{(metricas.participacion_pct || kpis.participacion || 0).toFixed(2)}%</b> participación</span>
+            </div>
+          </Card>
+          <Card className="territoryMini">
+            <p className="eyebrow">Estados desde backend</p>
+            <div className="progressMini" style={{flexWrap:'wrap',gap:'8px'}}>
+              {(metricas.por_estado || []).map((e) => <span key={e.estado}><b>{fmt(e.total)}</b> {e.estado}</span>)}
+            </div>
+          </Card>
+        </section>
+      )}
       <OepProgressPanel kpis={kpis} />
       <section className="kpiGrid">
         <Kpi icon="Ⓡ" label="Actas RRV" value={fmt(kpis.actasRRV)} hint="conteo rápido" />
-        <Kpi icon="Ⓞ" label="Actas oficiales" value={fmt(kpis.actasOficial)} hint="cómputo oficial" tone="green" />
+        <Kpi icon="Ⓞ" label="Actas oficiales" value={fmt(metricas?.total_actas ?? kpis.actasOficial)} hint="cómputo oficial" tone="green" />
         <Kpi icon="↯" label="Diferencia global" value={`${kpis.diferenciaGlobal >= 0 ? '+' : ''}${fmt(kpis.diferenciaGlobal)}`} hint="Oficial - RRV" tone={Math.abs(kpis.diferenciaGlobal) > 300 ? 'red' : 'gold'} />
         <Kpi icon="◌" label="Participación" value={`${kpis.participacion.toFixed(2)}%`} hint="sobre habilitados" tone="purple" />
         <Kpi icon="!" label="Inconsistencias" value={fmt(kpis.inconsistencias)} hint="campo por campo" tone="red" />
@@ -689,15 +773,153 @@ function Input({ label, value, onChange, text = false }) {
   );
 }
 
-function ActasPage({ oficial }) {
+// ─── AUTOMATIZACIÓN ──────────────────────────────────────────────
+
+function AutomatizacionPage({ backendStatus, onRefreshActas }) {
+  const [runId, setRunId]       = useState(null);
+  const [progreso, setProgreso] = useState(null);
+  const [error, setError]       = useState('');
+  const [runs, setRuns]         = useState([]);
+  const pollRef                 = useRef(null);
+
+  const loadRuns = async () => {
+    try { setRuns(await getRunsAutomatizacion()); } catch { }
+  };
+
+  useEffect(() => { loadRuns(); }, []);
+
+  const startPolling = (id) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const p = await getProgresoAutomatizacion(id);
+        setProgreso(p);
+        if (p.estado === 'COMPLETADO' || p.estado?.startsWith('ERROR')) {
+          clearInterval(pollRef.current);
+          loadRuns();
+          onRefreshActas();
+        }
+      } catch { }
+    }, 1500);
+  };
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  const handleIniciar = async () => {
+    if (!backendStatus.ok) { setError('Backend no disponible.'); return; }
+    setError('');
+    setProgreso(null);
+    try {
+      const res = await iniciarAutomatizacion();
+      setRunId(res.run_id);
+      startPolling(res.run_id);
+    } catch (e) {
+      if (e.status === 423) setError('Ya hay una automatización en progreso.');
+      else setError(`Error al iniciar: ${e.body?.detail || e.message}`);
+    }
+  };
+
+  const running   = progreso && progreso.estado === 'EN_PROGRESO';
+  const completed = progreso && progreso.estado === 'COMPLETADO';
+  const pct       = progreso ? progreso.porcentaje : 0;
+
+  return <>
+    <PageHeader eyebrow="Carga masiva" title="Automatización" subtitle="Carga las ~5396 actas del CSV de Transcripciones en la base de datos oficial.">
+      <button
+        className="primary"
+        onClick={handleIniciar}
+        disabled={running || !backendStatus.ok}
+      >
+        {running ? '⏳ Procesando...' : '⚡ Iniciar automatización'}
+      </button>
+    </PageHeader>
+
+    {error && <div className="resultBox error"><strong>{error}</strong></div>}
+
+    {progreso && (
+      <section className="heroGrid">
+        <Card className="progressHero">
+          <div><p className="eyebrow">Estado: <b>{progreso.estado}</b></p><h2>{pct.toFixed(1)}% completado</h2></div>
+          <div className="progressRail"><span style={{ width: `${pct}%`, background: completed ? '#2dd4bf' : '#6366f1', transition: 'width 0.5s ease' }} /></div>
+          <div className="progressMini">
+            <span><b>{fmt(progreso.procesadas)}</b> / {fmt(progreso.total)} procesadas</span>
+            <span style={{color:'#2dd4bf'}}><b>{fmt(progreso.exitosas)}</b> exitosas</span>
+            <span style={{color:'#fb7185'}}><b>{fmt(progreso.errores)}</b> errores</span>
+            <span style={{color:'#f59e0b'}}><b>{fmt(progreso.observadas)}</b> observadas</span>
+            <span style={{color:'#94a3b8'}}><b>{fmt(progreso.duplicadas)}</b> duplicadas</span>
+          </div>
+        </Card>
+
+        <Card>
+          <p className="eyebrow">Feed en vivo {running ? '🔴' : '⏹'}</p>
+          <h2>Últimas actas procesadas</h2>
+          <div className="timeline" style={{maxHeight:320,overflowY:'auto'}}>
+            {(progreso.recientes || []).map((r, i) => (
+              <div className="timeItem" key={i} style={{opacity: running ? 1 : 0.7}}>
+                <span style={{color: r.estado === 'VALIDA' ? '#2dd4bf' : r.estado === 'OBSERVADA_PENDIENTE_REVISION' ? '#f59e0b' : r.estado === 'DUPLICADA' ? '#94a3b8' : '#fb7185'}}>
+                  {r.estado}
+                </span>
+                <strong>{r.nro_acta}</strong>
+              </div>
+            ))}
+            {(!progreso.recientes || progreso.recientes.length === 0) && (
+              <p className="muted">Esperando datos...</p>
+            )}
+          </div>
+        </Card>
+      </section>
+    )}
+
+    {!progreso && (
+      <Card>
+        <p className="eyebrow">Instrucciones</p>
+        <h2>Cómo funciona la automatización</h2>
+        <ul className="prettyList">
+          <li>Las primeras <b>15 actas</b> se procesan una a una (simulación visual de entrada humana).</li>
+          <li>El resto (~5381 actas) se cargan en paralelo con <b>4 workers</b> concurrentes.</li>
+          <li>Cada acta pasa por el <b>validador</b> antes de persistirse en PostgreSQL.</li>
+          <li>Las actas rechazadas o duplicadas se registran en logs pero <b>no se escriben</b> en la BD.</li>
+          <li>Al terminar, el dashboard se actualiza con los datos reales.</li>
+        </ul>
+        {!backendStatus.ok && <div className="resultBox error"><strong>Backend no disponible. Levanta el servicio con Docker Compose primero.</strong></div>}
+      </Card>
+    )}
+
+    {runs.length > 0 && (
+      <Card>
+        <div className="tableHeader"><h2>Historial de ejecuciones</h2><button className="ghost" onClick={loadRuns}>Actualizar</button></div>
+        <div className="tableWrap"><table><thead><tr><th>ID</th><th>Estado</th><th>Total</th><th>Exitosas</th><th>Errores</th><th>Obs.</th><th>Dup.</th><th>Iniciado</th></tr></thead><tbody>
+          {runs.map((r) => (
+            <tr key={r.id}>
+              <td>{r.id}</td>
+              <td><Pill tone={r.estado === 'COMPLETADO' ? 'ok' : r.estado === 'EN_PROGRESO' ? 'warning' : r.estado?.startsWith('ERROR') ? 'danger' : 'neutral'}>{r.estado}</Pill></td>
+              <td>{fmt(r.total)}</td>
+              <td style={{color:'#2dd4bf'}}>{fmt(r.exitosas)}</td>
+              <td style={{color:'#fb7185'}}>{fmt(r.errores)}</td>
+              <td>{fmt(r.observadas)}</td>
+              <td>{fmt(r.duplicadas)}</td>
+              <td><small>{String(r.iniciado_en || '').replace('T',' ').slice(0,19)}</small></td>
+            </tr>
+          ))}
+        </tbody></table></div>
+      </Card>
+    )}
+  </>;
+}
+
+// ─── ACTAS ───────────────────────────────────────────────────────
+
+
+function ActasPage({ oficial, backendLoaded, onRefresh }) {
   const [filters, setFilters] = useState({ proceso: 'Elecciones Subnacionales 2026', departamento: '', provincia: '', municipio: '', recinto: '', mesa: '', estado: '', fuente: '', q: '' });
   const rows = useMemo(() => filterActas(oficial, filters), [oficial, filters]);
   return <>
-    <PageHeader eyebrow="Cómputo oficial" title="Actas Oficiales" subtitle="Listado visual del registro oficial preparado para PostgreSQL.">
+    <PageHeader eyebrow="Cómputo oficial" title="Actas Oficiales" subtitle={backendLoaded ? `${oficial.length} actas cargadas desde PostgreSQL.` : 'Listado visual del registro oficial preparado para PostgreSQL; usando mock/local hasta conectar backend.'}>
+      <button className="ghost" onClick={onRefresh}>Actualizar backend</button>
       <button className="primary" onClick={() => exportJson('actas-oficiales-front.json', rows)}>Exportar</button>
     </PageHeader>
     <Filters filters={filters} setFilters={setFilters} data={oficial} title="Filtro de actas oficiales" />
-    <Card><div className="tableHeader"><h2>{fmt(rows.length)} actas</h2><span>Vista frontend; la persistencia real corresponde al PostgreSQL oficial.</span></div><ResponsiveTable rows={rows.slice(0, 80)} /></Card>
+    <Card><div className="tableHeader"><h2>{fmt(rows.length)} actas</h2><span>{backendLoaded ? 'Datos reales de PostgreSQL' : 'Vista frontend; la persistencia real corresponde al PostgreSQL oficial.'}</span></div><ResponsiveTable rows={rows.slice(0, 100)} /></Card>
   </>;
 }
 
@@ -705,8 +927,8 @@ function ResponsiveTable({ rows }) {
   return <div className="tableWrap"><table><thead><tr><th>Acta</th><th>Mesa</th><th>Departamento</th><th>Municipio</th><th>Recinto</th><th>Total</th><th>Estado</th><th>Nota técnica</th></tr></thead><tbody>{rows.map((a) => <tr key={a.codigoActa}><td><b>{a.nroActa}</b></td><td>{a.nroMesa}</td><td>{a.departamento}</td><td>{a.municipio}</td><td>{a.recinto}</td><td>{fmt(a.totalVotos)}</td><td><Pill tone={String(a.estado).includes('OBS') ? 'warning' : 'ok'}>{a.estado}</Pill></td><td>{a.observacionTecnica ? <Pill tone="warning">Sí</Pill> : <span className="mutedText">—</span>}</td></tr>)}</tbody></table></div>;
 }
 
-function InconsistenciasPage({ oficial }) {
-  const rows = useMemo(() => buildInconsistencias(oficial, rrvActas), [oficial]);
+function InconsistenciasPage({ oficial, rrv = [] }) {
+  const rows = useMemo(() => buildInconsistencias(oficial, rrv), [oficial, rrv]);
   return <>
     <PageHeader eyebrow="Comparación" title="Inconsistencias RRV vs Oficial" subtitle="Diferencias campo por campo entre el documento RRV y el acta oficial.">
       <button className="primary" onClick={() => exportJson('inconsistencias-rrv-oficial.json', rows)}>Exportar</button>
@@ -736,21 +958,32 @@ function AuditoriaPage({ oficial, backendStatus }) {
   </>;
 }
 
-function IntegracionPage({ backendStatus, onCheckBackend }) {
+function IntegracionPage({ backendStatus, rrvStatus, onCheckBackend, onRefreshRrv }) {
   return <>
-    <PageHeader eyebrow="Documentación técnica" title="Integración con las bases de datos del equipo" subtitle="Este frontend no crea bases propias: consume PostgreSQL oficial y RRV MongoDB cuando esos servicios estén disponibles.">
+    <PageHeader eyebrow="Documentación técnica" title="Integración con las bases de datos del equipo" subtitle="Este frontend consume PostgreSQL oficial y RRV MongoDB; si el backend no está activo mantiene datos mock/local para demo.">
+      <button className="ghost" onClick={onRefreshRrv}>Reconectar RRV</button>
       <button className="primary" onClick={onCheckBackend}>Probar backend oficial</button>
     </PageHeader>
     <section className="architecture">
-      <Card><h2>Base oficial PostgreSQL</h2><img src="/diagrama-postgresql-oficial.png" alt="Diagrama PostgreSQL oficial" /><p>Usada por el Formulario Oficial mediante los endpoints del backend oficial. Tablas principales: acta_oficial, voto_oficial, auditoria_voto, mesa_electoral.</p></Card>
-      <Card><h2>Base RRV MongoDB</h2><img src="/diagrama-mongodb-rrv.png" alt="Diagrama MongoDB RRV" /><p>Usada por el Dashboard Comparativo. En los ZIP actuales no aparece el backend/cluster Mongo completo, por eso el frontend trae mock reemplazable.</p></Card>
+      <Card>
+        <h2>Base oficial PostgreSQL</h2>
+        <img src="/diagrama-postgresql-oficial.png" alt="Diagrama PostgreSQL oficial" />
+        <p>Usada por el Formulario Oficial y el Dashboard mediante el backend oficial. Tablas principales: acta_oficial, voto_oficial, auditoria_voto y mesa_electoral.</p>
+        <Pill tone={backendStatus.ok ? 'ok' : 'danger'}>{backendStatus.ok ? 'Conectado' : 'No disponible'}</Pill>
+      </Card>
+      <Card>
+        <h2>Base RRV MongoDB</h2>
+        <img src="/diagrama-mongodb-rrv.png" alt="Diagrama MongoDB RRV" />
+        <p>Usada por el Dashboard Comparativo. Configura <code>VITE_RRV_API_URL</code> en el <code>.env</code> para conectar el cluster/servicio RRV real.</p>
+        <Pill tone={rrvStatus.ok ? 'ok' : RRV_ENABLED ? 'danger' : 'neutral'}>{rrvStatus.label}</Pill>
+      </Card>
     </section>
     <section className="heroGrid">
-      <Card><h2>Endpoints esperados</h2><EndpointList /></Card>
-      <Card><h2>Qué hace mi parte</h2><ul className="prettyList"><li>Formulario oficial visual y validado.</li><li>Payload compatible con <code>POST /api/oficial/actas</code>.</li><li>Dashboard comparativo RRV vs Oficial.</li><li>Inconsistencias campo por campo.</li><li>Auditoría visual y preparada para backend.</li></ul></Card>
-      <Card><h2>Qué no hace mi parte</h2><ul className="prettyList"><li>No implementa OCR ni aplanado de PDF.</li><li>No implementa SMS ni app móvil.</li><li>No crea PostgreSQL Cluster ni MongoDB Cluster.</li><li>No hace n8n ni Selenium.</li><li>No reemplaza el backend oficial ni el backend RRV del equipo.</li></ul></Card>
+      <Card><h2>Endpoints conectados</h2><EndpointList /></Card>
+      <Card><h2>Qué hace mi parte</h2><ul className="prettyList"><li>Formulario oficial visual con combos dependientes.</li><li>Control anti doble carga y modal de validación/proceso/resultado.</li><li>Payload compatible con <code>POST /api/oficial/actas</code>.</li><li>Dashboard comparativo RRV vs Oficial.</li><li>Inconsistencias campo por campo y auditoría visual.</li><li>Automatización de carga masiva desde el backend de Marcelo.</li></ul></Card>
+      <Card><h2>Qué queda conectado del backend</h2><ul className="prettyList"><li>Health check en <code>/health</code>.</li><li>Listado y registro de actas oficiales.</li><li>Métricas de dashboard.</li><li>Auditoría del servicio oficial.</li><li>Inicio, progreso y runs de automatización.</li><li>RRV real si se configura <code>VITE_RRV_API_URL</code>.</li></ul></Card>
     </section>
-    <Card><h2>Configuración detectada</h2><pre className="codeBlock">{JSON.stringify({ backendStatus, apiInfo }, null, 2)}</pre></Card>
+    <Card><h2>Configuración detectada</h2><pre className="codeBlock">{JSON.stringify({ backendStatus, rrvStatus, apiInfo }, null, 2)}</pre></Card>
   </>;
 }
 
