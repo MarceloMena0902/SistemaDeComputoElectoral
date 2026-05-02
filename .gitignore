@@ -1,42 +1,4 @@
-﻿node_modules/
-**/node_modules/
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-store/
-
-.env
-.env.*
-!.env.example
-
+node_modules/
 dist/
-build/
-coverage/
-
-.vscode/
-.DS_Store
-Thumbs.db
-
-# Claude Code local settings (no commitear)
-.claude/
-
-SistemaComputoOficial/automatizacion/logs/*.jsonl
-SistemaComputoOficial/automatizacion/logs/*.log
-
-SistemaComputoOficial/automatizacion/selenium/reports/*.jsonl
-SistemaComputoOficial/automatizacion/selenium/reports/*.log
-SistemaComputoOficial/automatizacion/selenium/screenshots/*.png
-
-# Carpetas de pruebas o debugging local
-src/debug/
-src/prueba/
-
-# Logs locales de automatización
-logs/*.jsonl
-logs/*.log
-
-# Reportes y capturas Selenium
-selenium/reports/*.jsonl
-selenium/reports/*.log
-selenium/screenshots/*.png
+*.log
+*.response
