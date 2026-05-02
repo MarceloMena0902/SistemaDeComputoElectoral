@@ -1,5 +1,6 @@
 const OFICIAL_BASE = import.meta.env.VITE_OFICIAL_API_URL || 'http://localhost:4000';
-const RRV_BASE = import.meta.env.VITE_RRV_API_URL || '';
+export const RRV_BASE = import.meta.env.VITE_RRV_API_URL || '';
+export const RRV_ENABLED = Boolean(RRV_BASE);
 export const ENABLE_API_SUBMIT = import.meta.env.VITE_ENABLE_API_SUBMIT === 'true';
 
 async function request(path, options = {}) {
@@ -135,4 +136,61 @@ export async function tryGetJsonFrom(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+// ─── RRV (Recuento Rápido de Votos — cluster MongoDB) ────────────
+async function rrvFetch(path) {
+  const res = await fetch(`${RRV_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`RRV HTTP ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Transforma un documento de acta del cluster RRV (MongoDB) al formato
+ * normalizado que usan filterActas / buildKpis / buildInconsistencias.
+ * Los votos pueden venir aplanados o anidados en item.votos / item.datos_ocr.
+ */
+export function transformRrvActa(item, index) {
+  const v = item.votos || item.datos_ocr || item;
+  return {
+    codigoActa:          String(item._id || item.codigo_acta || item.nro_acta || `RRV-${index}`),
+    nroActa:             item.nro_acta || item.nombre || String(item._id || `RRV-${index}`),
+    codigoMesa:          Number(item.codigo_mesa  || 0),
+    nroMesa:             Number(item.nro_mesa     || 0),
+    codigoTerritorial:   Number(item.codigo_territorial || 0),
+    departamento:        item.departamento  || '',
+    provincia:           item.provincia     || '',
+    municipio:           item.municipio     || '',
+    recinto:             item.recinto || item.nombre_recinto || '',
+    votantesHabilitados: Number(item.nro_votantes || item.votantes_habilitados || 0),
+    p1:           Number(v.partido1  ?? v.p1 ?? 0),
+    p2:           Number(v.partido2  ?? v.p2 ?? 0),
+    p3:           Number(v.partido3  ?? v.p3 ?? 0),
+    p4:           Number(v.partido4  ?? v.p4 ?? 0),
+    votosBlancos: Number(v.votos_blancos ?? v.votosBlancos ?? 0),
+    votosNulos:   Number(v.votos_nulos   ?? v.votosNulos   ?? 0),
+    votosValidos: Number(v.votos_validos ?? v.votosValidos ?? 0),
+    totalVotos:   Number(v.total_votos   ?? v.totalVotos   ?? 0),
+    estado:             item.estado  || 'PROCESADA',
+    fuente:             'RRV',
+    origen:             item.source  || item.origen || 'RRV',
+    fechaRecepcion:     item.fecha_recepcion || item.fechaRecepcion || '',
+    observacionTecnica: item.observacion || item.observacionTecnica || '',
+  };
+}
+
+export async function getRrvMetricas() {
+  return rrvFetch('/metricas');
+}
+
+export async function getRrvResultadosNacionales() {
+  return rrvFetch('/resultados-nacionales');
+}
+
+export async function getRrvActas(limit = 500, skip = 0) {
+  const data = await rrvFetch(`/actas?limit=${limit}&skip=${skip}`);
+  const raw = data.actas || data.items || [];
+  return { actas: raw.map(transformRrvActa), total: data.total || raw.length };
 }

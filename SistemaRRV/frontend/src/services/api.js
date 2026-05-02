@@ -1,5 +1,4 @@
-// src/services/api.js
-const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.100.6:8000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://10.254.0.27:8000'
 
 async function fetchAPI(endpoint, options = {}) {
   const url = `${API_URL}${endpoint}`

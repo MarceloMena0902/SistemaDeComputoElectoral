@@ -258,19 +258,22 @@ async def _process_row(raw_row: dict, row_number: int, run_id: str, db_run_id: i
         await _db_log_detalle(db_run_id, nro_acta, "RECHAZADA", val.errors)
         return {"tipo": "RECHAZADA", "nro_acta": nro_acta, "errors": val.errors}
 
+    # Pre-validar sumas aritméticas de votos antes de tocar la DB
+    _p1, _p2, _p3, _p4 = v_data["partido1"], v_data["partido2"], v_data["partido3"], v_data["partido4"]
+    _vv = v_data["votos_validos"]
+    _tv = v_data["total_votos"]
+    _vb, _vn = v_data["votos_blancos"], v_data["votos_nulos"]
+    if _p1 + _p2 + _p3 + _p4 != _vv:
+        return {"tipo": "RECHAZADA", "nro_acta": nro_acta, "errors": [
+            f"CHECK votos_validos: {_p1}+{_p2}+{_p3}+{_p4} != {_vv}"
+        ]}
+    if _vv + _vb + _vn != _tv:
+        return {"tipo": "RECHAZADA", "nro_acta": nro_acta, "errors": [
+            f"CHECK total_votos: {_vv}+{_vb}+{_vn} != {_tv}"
+        ]}
+
     async with AsyncSessionWrite() as db:
         try:
-            # Verificar duplicado
-            existing = (
-                await db.execute(
-                    select(ActaOficial).where(ActaOficial.nro_acta == nro_acta)
-                )
-            ).scalar_one_or_none()
-
-            if existing is not None:
-                await _db_log_detalle(db_run_id, nro_acta, "DUPLICADA", [])
-                return {"tipo": "DUPLICADA", "nro_acta": nro_acta}
-
             # Garantizar jerarquía territorial
             cod_terr    = payload["codigo_territorial"]
             recinto_id  = payload["recinto_id"]
@@ -308,21 +311,32 @@ async def _process_row(raw_row: dict, row_number: int, run_id: str, db_run_id: i
                     )
                 await db.flush()
 
-            # Insertar acta + voto + auditoría
-            acta = ActaOficial(
-                nro_acta=nro_acta,
-                codigo_mesa=codigo_mesa,
-                estado=val.estado,
-                observacion=(payload["transcripcion"] or "")[:500] or None,
-                origen=payload["origen"],
-                registrado_por=payload["registrado_por"],
-                actualizado_por=payload["registrado_por"],
+            # Insertar acta — ON CONFLICT DO NOTHING + RETURNING para idempotencia
+            insert_acta = (
+                pg_insert(ActaOficial)
+                .values(
+                    nro_acta=nro_acta,
+                    codigo_mesa=codigo_mesa,
+                    estado=val.estado,
+                    observacion=(payload["transcripcion"] or "")[:500] or None,
+                    origen=payload["origen"],
+                    registrado_por=payload["registrado_por"],
+                    actualizado_por=payload["registrado_por"],
+                )
+                .on_conflict_do_nothing(index_elements=["nro_acta"])
+                .returning(ActaOficial.id_acta)
             )
-            db.add(acta)
-            await db.flush()
+            result_acta = await db.execute(insert_acta)
+            id_acta_row = result_acta.scalar_one_or_none()
+            if id_acta_row is None:
+                # Ya existía — duplicado sin error
+                await db.rollback()
+                await _db_log_detalle(db_run_id, nro_acta, "DUPLICADA", [])
+                return {"tipo": "DUPLICADA", "nro_acta": nro_acta}
+            acta_id = id_acta_row
 
             voto = VotoOficial(
-                id_acta=acta.id_acta,
+                id_acta=acta_id,
                 partido1=v_data["partido1"], partido2=v_data["partido2"],
                 partido3=v_data["partido3"], partido4=v_data["partido4"],
                 votos_validos=v_data["votos_validos"],

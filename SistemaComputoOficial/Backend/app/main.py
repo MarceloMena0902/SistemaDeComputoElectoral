@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import run_migrations
-from app.routers import actas, auditoria, dashboard, automatizacion
+from app.routers import actas, auditoria, dashboard, automatizacion, territorio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,6 +59,7 @@ app.include_router(actas.router,           prefix="/api",                    tag
 app.include_router(dashboard.router,       prefix="/api/dashboard",          tags=["Dashboard"])
 app.include_router(auditoria.router,       prefix="/api/auditoria",          tags=["Auditoria"])
 app.include_router(automatizacion.router,  prefix="/api/automatizacion",     tags=["Automatizacion"])
+app.include_router(territorio.router,      prefix="/api/territorio",         tags=["Territorio"])
 
 
 @app.get("/health", tags=["Sistema"])

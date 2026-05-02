@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { rrvActas } from './data/rrv.mock.js';
+import { rrvActas as rrvMock } from './data/rrv.mock.js';
 import {
   ENABLE_API_SUBMIT,
+  RRV_ENABLED,
   apiInfo,
   getAuditoriaOficial,
   getActasOficiales,
@@ -10,6 +11,7 @@ import {
   getProgresoOficial,
   getResultadosOficiales,
   getRunsAutomatizacion,
+  getRrvActas,
   healthOficial,
   iniciarAutomatizacion,
   registrarActaOficial,
@@ -52,6 +54,8 @@ export default function App() {
   const [backendActas, setBackendActas] = useState([]);
   const [backendLoaded, setBackendLoaded] = useState(false);
   const [backendStatus, setBackendStatus] = useState({ checked: false, ok: false, label: 'sin comprobar' });
+  const [rrvActas, setRrvActas] = useState(rrvMock);
+  const [rrvStatus, setRrvStatus] = useState({ loaded: false, ok: false, label: RRV_ENABLED ? 'conectando...' : 'mock' });
 
   const oficialActas = useMemo(() => {
     const base = backendLoaded && backendActas.length > 0 ? backendActas : [];
@@ -89,6 +93,22 @@ export default function App() {
     }
   }, []);
 
+  const fetchRrvActas = useCallback(async () => {
+    if (!RRV_ENABLED) return;
+    setRrvStatus({ loaded: false, ok: false, label: 'conectando...' });
+    try {
+      const data = await getRrvActas(1000);
+      if (data.actas.length > 0) {
+        setRrvActas(data.actas);
+        setRrvStatus({ loaded: true, ok: true, label: `${data.actas.length} actas RRV reales` });
+      } else {
+        setRrvStatus({ loaded: true, ok: true, label: 'RRV vacío — usando mock' });
+      }
+    } catch (e) {
+      setRrvStatus({ loaded: true, ok: false, label: `Error RRV: ${e.message}` });
+    }
+  }, []);
+
   useEffect(() => {
     checkBackend().then(() => {});
   }, [checkBackend]);
@@ -99,14 +119,18 @@ export default function App() {
     }
   }, [backendStatus.ok, fetchBackendActas]);
 
+  useEffect(() => {
+    fetchRrvActas();
+  }, [fetchRrvActas]);
+
   const page = {
-    dashboard:       <Dashboard oficial={oficialActas} />,
+    dashboard:       <Dashboard oficial={oficialActas} rrv={rrvActas} />,
     formulario:      <Formulario oficial={oficialActas} onSave={saveCustomActa} backendStatus={backendStatus} onCheckBackend={checkBackend} />,
     automatizacion:  <AutomatizacionPage backendStatus={backendStatus} onRefreshActas={fetchBackendActas} />,
     actas:           <ActasPage oficial={oficialActas} backendLoaded={backendLoaded} onRefresh={fetchBackendActas} />,
-    inconsistencias: <InconsistenciasPage oficial={oficialActas} />,
+    inconsistencias: <InconsistenciasPage oficial={oficialActas} rrv={rrvActas} />,
     auditoria:       <AuditoriaPage oficial={oficialActas} backendStatus={backendStatus} />,
-    integracion:     <IntegracionPage backendStatus={backendStatus} onCheckBackend={checkBackend} />,
+    integracion:     <IntegracionPage backendStatus={backendStatus} rrvStatus={rrvStatus} onCheckBackend={checkBackend} onRefreshRrv={fetchRrvActas} />,
   }[active];
 
   return (
@@ -128,8 +152,9 @@ export default function App() {
         </nav>
         <div className="sideStatus">
           <small>Estado de integración</small>
-          <div className="statusLine"><i className={backendStatus.ok ? 'dot ok' : 'dot warn'} /> Servicio oficial: {backendStatus.ok ? 'conectado' : 'modo demo'}</div>
+          <div className="statusLine"><i className={backendStatus.ok ? 'dot ok' : 'dot warn'} /> Oficial: {backendStatus.ok ? 'conectado' : 'modo demo'}</div>
           <div className="statusLine"><i className={backendLoaded ? 'dot ok' : 'dot info'} /> Actas: {backendLoaded ? `${backendActas.length} cargadas` : 'sin datos reales'}</div>
+          <div className="statusLine"><i className={rrvStatus.ok ? 'dot ok' : RRV_ENABLED ? 'dot warn' : 'dot info'} /> RRV: {rrvStatus.label}</div>
           <button className="miniButton" onClick={checkBackend}>Comprobar backend</button>
         </div>
       </aside>
@@ -205,11 +230,11 @@ function Filters({ filters, setFilters, data, title = 'Filtros de resultados' })
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────
-function Dashboard({ oficial }) {
+function Dashboard({ oficial, rrv }) {
   const [filters, setFilters] = useState({ proceso: 'Elecciones Subnacionales 2026', departamento: '', provincia: '', municipio: '', recinto: '', mesa: '', estado: '', fuente: '', q: '' });
   const [metricas, setMetricas] = useState(null);
   const oficialF = useMemo(() => filterActas(oficial, filters), [oficial, filters]);
-  const rrvF = useMemo(() => filterActas(rrvActas, filters), [filters]);
+  const rrvF = useMemo(() => filterActas(rrv, filters), [rrv, filters]);
   const kpis = useMemo(() => buildKpis(oficialF, rrvF), [oficialF, rrvF]);
   const compare = useMemo(() => compareParties(oficialF, rrvF), [oficialF, rrvF]);
   const deps = useMemo(() => departmentSummary(oficialF, rrvF), [oficialF, rrvF]);
@@ -227,7 +252,7 @@ function Dashboard({ oficial }) {
       <PageHeader eyebrow="Dashboard analítico" title="RRV vs Cómputo Oficial" subtitle="Vista comparativa PostgreSQL oficial vs MongoDB RRV.">
         <button className="primary" onClick={() => exportJson('comparativo-rrv-vs-oficial.json', { kpis, compare, inconsistencias: inconsistencias.slice(0, 80) })}>Exportar JSON</button>
       </PageHeader>
-      <Filters filters={filters} setFilters={setFilters} data={[...oficial, ...rrvActas]} title="Filtro territorial y de actas" />
+      <Filters filters={filters} setFilters={setFilters} data={[...oficial, ...rrv]} title="Filtro territorial y de actas" />
 
       <section className="oepProgressGrid">
         <Card className="progressHero">
@@ -597,8 +622,8 @@ function ResponsiveTable({ rows }) {
 }
 
 // ─── INCONSISTENCIAS ─────────────────────────────────────────────
-function InconsistenciasPage({ oficial }) {
-  const rows = useMemo(() => buildInconsistencias(oficial, rrvActas), [oficial]);
+function InconsistenciasPage({ oficial, rrv }) {
+  const rows = useMemo(() => buildInconsistencias(oficial, rrv), [oficial, rrv]);
   return <>
     <PageHeader eyebrow="Comparación" title="Inconsistencias RRV vs Oficial" subtitle="Diferencias campo por campo.">
       <button className="primary" onClick={() => exportJson('inconsistencias.json', rows)}>Exportar</button>
@@ -655,16 +680,30 @@ function AuditoriaPage({ oficial, backendStatus }) {
 }
 
 // ─── INTEGRACIÓN ─────────────────────────────────────────────────
-function IntegracionPage({ backendStatus, onCheckBackend }) {
+function IntegracionPage({ backendStatus, rrvStatus, onCheckBackend, onRefreshRrv }) {
   return <>
     <PageHeader eyebrow="Documentación técnica" title="Integración con las bases de datos" subtitle="Este frontend consume PostgreSQL oficial y RRV MongoDB.">
+      <button className="ghost" onClick={onRefreshRrv}>Reconectar RRV</button>
       <button className="primary" onClick={onCheckBackend}>Probar backend oficial</button>
     </PageHeader>
     <section className="architecture">
-      <Card><h2>Base oficial PostgreSQL</h2><img src="/diagrama-postgresql-oficial.png" alt="PostgreSQL" /><p>Primary/Standby Streaming Replication + HAProxy HA. Tablas: acta_oficial, voto_oficial, auditoria_voto.</p></Card>
-      <Card><h2>Base RRV MongoDB</h2><img src="/diagrama-mongodb-rrv.png" alt="MongoDB" /><p>Dashboard comparativo. Mock reemplazable por endpoint real.</p></Card>
+      <Card>
+        <h2>Base oficial PostgreSQL</h2>
+        <img src="/diagrama-postgresql-oficial.png" alt="PostgreSQL" />
+        <p>Primary/Standby Streaming Replication + HAProxy HA. Tablas: acta_oficial, voto_oficial, auditoria_voto.</p>
+        <Pill tone={backendStatus.ok ? 'ok' : 'danger'}>{backendStatus.ok ? 'Conectado' : 'No disponible'}</Pill>
+      </Card>
+      <Card>
+        <h2>Base RRV MongoDB</h2>
+        <img src="/diagrama-mongodb-rrv.png" alt="MongoDB" />
+        <p>Cluster RRV — actas preliminares procesadas por OCR/SMS. Configura <code>VITE_RRV_API_URL</code> en tu <code>.env</code> para conectar al cluster real.</p>
+        <Pill tone={rrvStatus.ok ? 'ok' : RRV_ENABLED ? 'danger' : 'neutral'}>{rrvStatus.label}</Pill>
+      </Card>
     </section>
-    <Card><h2>Configuración detectada</h2><pre className="codeBlock">{JSON.stringify({ backendStatus, apiInfo }, null, 2)}</pre></Card>
+    <Card>
+      <h2>Configuración detectada</h2>
+      <pre className="codeBlock">{JSON.stringify({ backendStatus, rrvStatus, apiInfo }, null, 2)}</pre>
+    </Card>
   </>;
 }
 
