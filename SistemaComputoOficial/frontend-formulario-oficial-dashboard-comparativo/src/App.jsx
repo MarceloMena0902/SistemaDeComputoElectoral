@@ -139,6 +139,29 @@ function getUniqueOptions(data, key, predicate = () => true) {
     .sort((a, b) => a.localeCompare(b, 'es'));
 }
 
+function getUniqueSelectOptions(data, valueKey, labelBuilder, predicate = () => true) {
+  const map = new Map();
+  data.filter(predicate).forEach((item) => {
+    const value = item[valueKey];
+    if (value === undefined || value === null || String(value).trim() === '') return;
+    const key = String(value);
+    if (!map.has(key)) {
+      map.set(key, { value: key, label: labelBuilder(item), item });
+    }
+  });
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'es'));
+}
+
+function uniqueActasByCode(actas) {
+  const map = new Map();
+  actas.forEach((a) => {
+    const key = String(a.codigoActa || a.codigoMesa || a.nroActa || '');
+    if (!key) return;
+    if (!map.has(key)) map.set(key, a);
+  });
+  return [...map.values()].sort((a, b) => Number(a.nroMesa || 0) - Number(b.nroMesa || 0) || String(a.codigoActa).localeCompare(String(b.codigoActa)));
+}
+
 function Filters({ filters, setFilters, data, title = 'Filtros de resultados' }) {
   const byDepartamento = (a) => !filters.departamento || a.departamento === filters.departamento;
   const byProvincia = (a) => byDepartamento(a) && (!filters.provincia || a.provincia === filters.provincia);
@@ -378,54 +401,170 @@ function TechnicalNotesPanel({ rows }) {
 }
 
 function Formulario({ oficial, onSave, backendStatus, onCheckBackend }) {
-  const [selected, setSelected] = useState(oficial[0]?.codigoActa || '');
-  const base = oficial.find((a) => String(a.codigoActa) === String(selected)) || oficial[0];
-  const [form, setForm] = useState(() => toForm(base));
+  const firstActa = oficial[0] || {};
+  const [selected, setSelected] = useState(firstActa.codigoActa || '');
+  const [territory, setTerritory] = useState(() => territoryFromActa(firstActa));
+  const selectedBase = useMemo(() => oficial.find((a) => String(a.codigoActa) === String(selected)) || null, [oficial, selected]);
+  const [form, setForm] = useState(() => toForm(selectedBase || firstActa));
   const [result, setResult] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [modal, setModal] = useState(null);
 
-  useEffect(() => { setForm(toForm(base)); setResult(null); }, [selected]);
+  useEffect(() => {
+    if (!selectedBase) return;
+    setForm(toForm(selectedBase));
+    setTerritory(territoryFromActa(selectedBase));
+    setResult(null);
+    setModal(null);
+  }, [selectedBase?.codigoActa]);
+
   const validation = useMemo(() => validateOfficialForm(form, oficial), [form, oficial]);
+  const hardErrors = validation.issues.filter((issue) => issue.type === 'ERROR');
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  const filtered = useMemo(() => {
+    const departamentos = getUniqueOptions(oficial, 'departamento');
+    const byDepartamento = (a) => !territory.departamento || a.departamento === territory.departamento;
+    const byProvincia = (a) => byDepartamento(a) && (!territory.provincia || a.provincia === territory.provincia);
+    const byMunicipio = (a) => byProvincia(a) && (!territory.municipio || a.municipio === territory.municipio);
+    const byRecinto = (a) => byMunicipio(a) && (!territory.recintoCode || String(a.codigoRecinto) === String(territory.recintoCode));
+    return {
+      departamentos,
+      provincias: getUniqueOptions(oficial, 'provincia', byDepartamento),
+      municipios: getUniqueOptions(oficial, 'municipio', byProvincia),
+      recintos: getUniqueSelectOptions(
+        oficial,
+        'codigoRecinto',
+        (a) => a.recinto,
+        byMunicipio,
+      ),
+      actas: uniqueActasByCode(oficial.filter(byRecinto)),
+    };
+  }, [oficial, territory]);
+
+  const resetFormForTerritory = (nextTerritory) => {
+    setForm((prev) => ({
+      ...prev,
+      departamento: nextTerritory.departamento || '',
+      provincia: nextTerritory.provincia || '',
+      municipio: nextTerritory.municipio || '',
+      recinto: nextTerritory.recinto || '',
+      codigoRecinto: nextTerritory.recintoCode || '',
+      codigoActa: '',
+      nroActa: '',
+      codigoMesa: '',
+      nroMesa: '',
+      codigoTerritorial: '',
+      codigoRecinto: '',
+    }));
+  };
+
+  const updateTerritory = (key, value) => {
+    let next = { ...territory, [key]: value };
+
+    if (key === 'departamento') next = { departamento: value, provincia: '', municipio: '', recinto: '', recintoCode: '', acta: '' };
+    if (key === 'provincia') next = { ...next, municipio: '', recinto: '', recintoCode: '', acta: '' };
+    if (key === 'municipio') next = { ...next, recinto: '', recintoCode: '', acta: '' };
+    if (key === 'recintoCode') {
+      const selectedRecinto = filtered.recintos.find((r) => String(r.value) === String(value));
+      next = { ...next, recintoCode: value, recinto: selectedRecinto?.item?.recinto || '', acta: '' };
+    }
+
+    setTerritory(next);
+    setSelected('');
+    resetFormForTerritory(next);
+    setResult(null);
+  };
+
+  const updateSelectedActa = (codigoActa) => {
+    setSelected(codigoActa);
+    const acta = oficial.find((a) => String(a.codigoActa) === String(codigoActa));
+    if (acta) {
+      setTerritory({ ...territoryFromActa(acta), acta: codigoActa });
+    } else {
+      setTerritory((t) => ({ ...t, acta: codigoActa }));
+    }
+  };
+
   const save = async () => {
-    const hardErrors = validation.issues.filter((issue) => issue.type === 'ERROR');
+    if (isSaving) return;
+    setResult(null);
+
     if (hardErrors.length) {
-      setResult({
-        ok: false,
-        text: 'No se puede guardar el acta porque tiene errores de validación.',
-        response: hardErrors.map((issue) => issue.text),
-      });
+      const response = hardErrors.map((issue) => issue.text);
+      setResult({ ok: false, text: 'No se puede guardar el acta porque tiene errores de validación.', response });
+      setModal({ type: 'error', title: 'Acta no registrada', text: 'Corrige los errores marcados antes de guardar.', response });
       return;
     }
 
+    setIsSaving(true);
+    setModal({ type: 'loading', title: 'Procesando acta oficial', text: 'Se está validando y preparando el payload. El botón queda bloqueado para evitar doble carga.' });
+
     const saved = {
       ...form,
+      codigoActa: form.codigoActa || form.codigoMesa,
       estado: validation.estadoVisual === 'PROCESADA' ? 'VALIDA' : validation.estadoVisual === 'OBSERVADA' ? 'OBSERVADA_PENDIENTE_REVISION' : validation.estadoVisual,
       votosValidos: validation.votosValidosCalculados,
       totalVotos: validation.totalCalculado,
       fechaRegistro: new Date().toISOString(),
     };
-    onSave(saved);
-    if (ENABLE_API_SUBMIT) {
-      try {
+
+    try {
+      onSave(saved);
+      if (ENABLE_API_SUBMIT) {
         const response = await registrarActaOficial(validation.backendPayload);
         setResult({ ok: true, text: 'Acta validada y enviada al servicio oficial configurado.', response });
-      } catch (e) {
-        setResult({ ok: false, text: 'Acta validada localmente, pero el servicio oficial no respondió.', response: e.body || e.message });
+        setModal({ type: 'success', title: 'Acta registrada', text: 'El acta fue enviada al servicio oficial configurado.', response });
+      } else {
+        setResult({ ok: true, text: 'Acta validada en modo demostración. El payload queda listo para integración con el servicio oficial.', response: validation.backendPayload });
+        setModal({ type: 'success', title: 'Acta preparada correctamente', text: 'El acta fue validada localmente y el payload quedó listo para integración.', response: validation.backendPayload });
       }
-    } else {
-      setResult({ ok: true, text: 'Acta validada en modo demostración. El payload queda listo para integración con el servicio oficial.', response: validation.backendPayload });
+    } catch (e) {
+      const response = e.body || e.message;
+      setResult({ ok: false, text: 'Acta validada localmente, pero el servicio oficial no respondió.', response });
+      setModal({ type: 'error', title: 'Servicio oficial no disponible', text: 'La validación local terminó, pero el backend configurado no respondió.', response });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  return <>
-    <PageHeader eyebrow="Cómputo oficial" title="Formulario Oficial" subtitle="Captura y validación visual antes de enviar a PostgreSQL oficial.">
-      <button className="ghost" onClick={onCheckBackend}>Comprobar backend</button>
-      <button className="primary" onClick={save}>Guardar acta</button>
+  const submit = (e) => {
+    e.preventDefault();
+    save();
+  };
+
+  return <form className="officialForm" onSubmit={submit}>
+    <PageHeader eyebrow="Cómputo oficial" title="Formulario Oficial" subtitle="Captura guiada con combos dependientes para evitar datos territoriales incorrectos.">
+      <button type="button" className="ghost" onClick={onCheckBackend}>Comprobar backend</button>
+      <button type="submit" className="primary" disabled={isSaving}>{isSaving ? 'Guardando...' : 'Guardar acta'}</button>
     </PageHeader>
     <Card className="formTop glass">
-      <label><span>Acta base de prueba</span><select value={selected} onChange={(e) => setSelected(e.target.value)}>{oficial.slice(0, 140).map((a) => <option key={a.codigoActa} value={a.codigoActa}>Acta {a.nroActa} · Mesa {a.nroMesa} · {a.recinto}</option>)}</select></label>
-      <Pill tone={validation.estadoVisual === 'RECHAZADA' ? 'danger' : validation.estadoVisual === 'OBSERVADA' ? 'warning' : 'ok'}>Payload oficial listo</Pill>
+      <div>
+        <p className="eyebrow">Selección guiada</p>
+        <h2>Primero departamento, luego provincia, municipio, recinto y mesa</h2>
+        <p className="helperText">Los campos territoriales son listas dependientes. El recinto muestra solo su nombre y la mesa muestra solo su número; el código de acta se carga automáticamente.</p>
+      </div>
+      <Pill tone={validation.estadoVisual === 'RECHAZADA' ? 'danger' : validation.estadoVisual === 'OBSERVADA' ? 'warning' : 'ok'}>{validation.estadoVisual}</Pill>
       <Pill tone={backendStatus.ok ? 'ok' : 'neutral'}>{backendStatus.ok ? 'Servicio oficial disponible' : 'Modo demostración'}</Pill>
+    </Card>
+    <Card className="formPanel span2 cascadePanel">
+      <div className="cascadeHeader">
+        <div>
+          <h2>Ubicación oficial del acta</h2>
+          <p className="muted">Solo el departamento inicia desbloqueado. Cada selección habilita el siguiente nivel.</p>
+        </div>
+        <Pill tone={selected ? 'ok' : 'warning'}>{selected ? 'Mesa cargada' : 'Seleccione una mesa'}</Pill>
+      </div>
+      <div className="fields comboGrid">
+        <ComboSelect label="Departamento" value={territory.departamento} options={filtered.departamentos} onChange={(v) => updateTerritory('departamento', v)} placeholder="Seleccione departamento" />
+        <ComboSelect label="Provincia" value={territory.provincia} options={filtered.provincias} onChange={(v) => updateTerritory('provincia', v)} placeholder="Seleccione provincia" disabled={!territory.departamento} />
+        <ComboSelect label="Municipio" value={territory.municipio} options={filtered.municipios} onChange={(v) => updateTerritory('municipio', v)} placeholder="Seleccione municipio" disabled={!territory.provincia} />
+        <ComboSelect label="Recinto" value={territory.recintoCode} options={filtered.recintos} onChange={(v) => updateTerritory('recintoCode', v)} placeholder="Seleccione recinto" disabled={!territory.municipio} />
+        <label className="comboSelect"><span>Mesa</span><select value={selected || ''} disabled={!territory.recintoCode} onChange={(e) => updateSelectedActa(e.target.value)}>
+          <option value="">{territory.recintoCode ? 'Seleccione mesa' : 'Primero seleccione recinto'}</option>
+          {filtered.actas.map((a) => <option key={a.codigoActa} value={a.codigoActa}>Mesa {a.nroMesa}</option>)}
+        </select><small>{territory.recintoCode ? `${filtered.actas.length} mesas disponibles para este recinto` : 'Bloqueado hasta seleccionar recinto'}</small></label>
+      </div>
     </Card>
     <section className="formLayout">
       <Card className="formPanel span2"><h2>Datos oficiales del acta</h2><div className="fields grid4">
@@ -438,11 +577,11 @@ function Formulario({ oficial, onSave, backendStatus, onCheckBackend }) {
         <Input label="Papeletas no utilizadas" value={form.papeletasNoUtilizadas} onChange={(v) => update('papeletasNoUtilizadas', v)} />
         <Input label="Registrado por ID" value={form.registradoPor} onChange={(v) => update('registradoPor', v)} />
       </div></Card>
-      <Card className="formPanel"><h2>Ubicación</h2><div className="fields">
-        <Input label="Departamento" value={form.departamento} onChange={(v) => update('departamento', v)} text />
-        <Input label="Provincia" value={form.provincia} onChange={(v) => update('provincia', v)} text />
-        <Input label="Municipio" value={form.municipio} onChange={(v) => update('municipio', v)} text />
-        <Input label="Recinto" value={form.recinto} onChange={(v) => update('recinto', v)} text />
+      <Card className="formPanel"><h2>Ubicación cargada</h2><div className="readOnlySummary">
+        <div><span>Departamento</span><strong>{form.departamento || 'Pendiente'}</strong></div>
+        <div><span>Provincia</span><strong>{form.provincia || 'Pendiente'}</strong></div>
+        <div><span>Municipio</span><strong>{form.municipio || 'Pendiente'}</strong></div>
+        <div><span>Recinto</span><strong>{form.recinto || 'Pendiente'}</strong></div>
       </div></Card>
       <Card className="formPanel"><h2>Votos</h2><div className="fields grid2">
         {['p1','p2','p3','p4','votosBlancos','votosNulos'].map((key) => <Input key={key} label={labelFor(key)} value={form[key]} onChange={(v) => update(key, v)} />)}
@@ -457,11 +596,45 @@ function Formulario({ oficial, onSave, backendStatus, onCheckBackend }) {
           <label><span>Observación oficial</span><textarea value={form.observaciones || ''} onChange={(e) => update('observaciones', e.target.value)} placeholder="Observación del acta, si corresponde..." /></label>
           <label><span>Observación técnica opcional</span><textarea value={form.observacionTecnica || ''} onChange={(e) => update('observacionTecnica', e.target.value)} placeholder="Ej.: Aplanado ***, recortado, cambio A4/A0, duplicado..." /></label>
         </div>
-        <p className="helperText">La observación técnica es informativa. El formulario la muestra para trazabilidad, pero no procesa PDF ni OCR.</p>
+        <p className="helperText">La observación técnica es informativa. El formulario la muestra para trazabilidad, pero no procesa PDF ni OCR. Presione Enter desde un campo simple o use el botón Guardar acta.</p>
         {result && <div className={`resultBox ${result.ok ? 'ok' : 'error'}`}><strong>{result.text}</strong><pre>{JSON.stringify(result.response, null, 2)}</pre></div>}
       </Card>
     </section>
-  </>;
+    {modal && <SubmitModal modal={modal} onClose={() => !isSaving && setModal(null)} />}
+  </form>;
+}
+
+function territoryFromActa(a = {}) {
+  return {
+    departamento: a.departamento || '',
+    provincia: a.provincia || '',
+    municipio: a.municipio || '',
+    recinto: a.recinto || '',
+    recintoCode: a.codigoRecinto ? String(a.codigoRecinto) : '',
+    acta: a.codigoActa || '',
+  };
+}
+
+function ComboSelect({ label, value, options, onChange, placeholder, disabled = false }) {
+  const normalized = options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option));
+  return <label className="comboSelect"><span>{label}</span><select value={value || ''} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+    <option value="">{disabled ? 'Bloqueado' : placeholder}</option>
+    {normalized.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+  </select><small>{disabled ? 'Complete el campo anterior' : `${normalized.length} opciones disponibles`}</small></label>;
+}
+
+function SubmitModal({ modal, onClose }) {
+  const isLoading = modal.type === 'loading';
+  const isError = modal.type === 'error';
+  return <div className="submitModalBackdrop" role="dialog" aria-modal="true">
+    <div className={`submitModal ${modal.type}`}>
+      <div className="modalIcon">{isLoading ? '⏳' : isError ? '✕' : '✓'}</div>
+      <h2>{modal.title}</h2>
+      <p>{modal.text}</p>
+      {modal.response && !isLoading && <pre>{JSON.stringify(modal.response, null, 2)}</pre>}
+      <button type="button" className="primary" onClick={onClose} disabled={isLoading}>{isLoading ? 'Procesando...' : 'Entendido'}</button>
+    </div>
+  </div>;
 }
 
 function toForm(a = {}) {

@@ -274,3 +274,92 @@ td { color: #e8eef8; } tbody tr:hover { background: rgba(96,165,250,.06); }
   .progressMini, .candidateRow { grid-template-columns: 1fr; }
   .candidateRow b { text-align: left; }
 }
+
+/* Formulario oficial: combos dependientes, bloqueo de doble carga y modal */
+.officialForm { display: block; }
+button:disabled, select:disabled, input:disabled { cursor: not-allowed; opacity: .62; }
+.cascadePanel { margin-bottom: 18px; }
+.cascadeHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 16px; }
+.cascadeHeader h2 { margin-bottom: 8px; }
+.comboGrid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.comboSelect small {
+  display: block;
+  margin-top: 7px;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.comboSelect select:disabled {
+  background: rgba(255,255,255,.035);
+  border-color: rgba(255,255,255,.07);
+  color: var(--faint);
+}
+.readOnlySummary { display: grid; gap: 12px; }
+.readOnlySummary div {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 13px;
+  background: rgba(255,255,255,.045);
+}
+.readOnlySummary span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+.readOnlySummary strong { display: block; color: var(--text); line-height: 1.35; }
+.submitModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, .72);
+  backdrop-filter: blur(16px);
+}
+.submitModal {
+  width: min(680px, 100%);
+  max-height: 86vh;
+  overflow: auto;
+  text-align: center;
+  border: 1px solid var(--line2);
+  border-radius: 30px;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 25% 0%, rgba(96,165,250,.22), transparent 34%),
+    radial-gradient(circle at 90% 10%, rgba(45,212,191,.16), transparent 30%),
+    #0b1222;
+  box-shadow: 0 34px 120px rgba(0,0,0,.52);
+}
+.submitModal.error { background: radial-gradient(circle at 25% 0%, rgba(251,113,133,.23), transparent 34%), #0b1222; }
+.submitModal.success { background: radial-gradient(circle at 25% 0%, rgba(45,212,191,.22), transparent 34%), #0b1222; }
+.modalIcon {
+  width: 66px;
+  height: 66px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid var(--line);
+  font-size: 28px;
+}
+.submitModal h2 { margin: 0 0 10px; font-size: 30px; letter-spacing: -.05em; }
+.submitModal p { color: var(--muted); line-height: 1.6; margin: 0 0 16px; }
+.submitModal pre {
+  text-align: left;
+  max-height: 260px;
+  overflow: auto;
+  border-radius: 18px;
+  padding: 14px;
+  background: #050914;
+  border: 1px solid rgba(96,165,250,.18);
+  color: #dbeafe;
+  font-size: 12px;
+}
+@media (max-width: 1180px) { .comboGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .comboGrid, .cascadeHeader { grid-template-columns: 1fr; display: grid; } }
