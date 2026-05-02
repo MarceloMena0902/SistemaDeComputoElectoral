@@ -1,0 +1,339 @@
+:root {
+  --bg: #0f172a;
+  --panel: rgba(15, 23, 42, 0.92);
+  --panel-soft: rgba(30, 41, 59, 0.92);
+  --border: rgba(148, 163, 184, 0.22);
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --primary: #22c55e;
+  --primary-soft: rgba(34, 197, 94, 0.16);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.16);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.16);
+  --blue: #38bdf8;
+  --blue-soft: rgba(56, 189, 248, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.22), transparent 34%),
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.18), transparent 30%),
+    linear-gradient(135deg, #020617, #0f172a 55%, #111827);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.dashboard-page {
+  width: min(1440px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 26px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 56px);
+  line-height: 1;
+}
+
+.subtitle {
+  max-width: 760px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.primary-button,
+.secondary-button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+  transition: 0.18s ease;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #052e16;
+}
+
+.secondary-button {
+  background: rgba(15, 23, 42, 0.78);
+  color: var(--text);
+}
+
+.primary-button:hover,
+.secondary-button:hover {
+  transform: translateY(-2px);
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.kpi-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 22px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+}
+
+.kpi-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.kpi-card strong {
+  font-size: 34px;
+}
+
+.kpi-card.success {
+  background: linear-gradient(135deg, var(--panel), var(--primary-soft));
+}
+
+.kpi-card.warning {
+  background: linear-gradient(135deg, var(--panel), var(--warning-soft));
+}
+
+.kpi-card.danger {
+  background: linear-gradient(135deg, var(--panel), var(--blue-soft));
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 22px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.panel-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.status-pill {
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#bolivia-map {
+  width: 100%;
+  height: 560px;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #0b1220;
+  border: 1px solid var(--border);
+}
+
+.leaflet-container {
+  background: #0b1220;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #0f172a;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.bars {
+  display: grid;
+  gap: 18px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 90px;
+  gap: 12px;
+  align-items: center;
+}
+
+.bar-row span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.bar-row strong {
+  text-align: right;
+  font-size: 14px;
+}
+
+.bar-track {
+  height: 12px;
+  background: rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  transition: width 0.35s ease;
+}
+
+.vote-summary {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.vote-summary div {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px;
+  background: var(--panel-soft);
+}
+
+.vote-summary span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.vote-summary strong {
+  font-size: 20px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 14px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+td {
+  color: var(--text);
+}
+
+tr:hover td {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+@media (max-width: 980px) {
+  .dashboard-header,
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #bolivia-map {
+    height: 420px;
+  }
+}
+
+@media (max-width: 640px) {
+  .kpi-grid,
+  .vote-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .bar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bar-row strong {
+    text-align: left;
+  }
+}
+.department-label {
+  background: rgba(15, 23, 42, 0.92);
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-weight: 800;
+  text-align: center;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.department-label::before {
+  display: none;
+}

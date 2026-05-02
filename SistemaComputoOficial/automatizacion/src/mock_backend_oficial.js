@@ -165,6 +165,114 @@ app.delete("/api/oficial/actas", (req, res) => {
   });
 });
 
+function getDepartamentoByCodigoTerritorial(codigoTerritorial) {
+  const code = String(codigoTerritorial || "");
+
+  const firstDigit = code.charAt(0);
+
+  const departments = {
+    "1": "Chuquisaca",
+    "2": "La Paz",
+    "3": "Cochabamba",
+    "4": "Oruro",
+    "5": "Potosí",
+    "6": "Tarija",
+    "7": "Santa Cruz",
+    "8": "Beni",
+    "9": "Pando"
+  };
+
+  return departments[firstDigit] || "Sin departamento";
+}
+
+function buildDashboardSummary() {
+  const actas = Array.from(actasRegistradas.values());
+
+  const summary = {
+    totalActas: actas.length,
+    validas: 0,
+    observadas: 0,
+    totalVotos: 0,
+    votosValidos: 0,
+    votosBlancos: 0,
+    votosNulos: 0,
+    partidos: {
+      partido1: 0,
+      partido2: 0,
+      partido3: 0,
+      partido4: 0
+    }
+  };
+
+  for (const acta of actas) {
+    if (acta.estado_acta === "OBSERVADA_PENDIENTE_REVISION" || acta.requiere_revision_humana) {
+      summary.observadas++;
+    } else {
+      summary.validas++;
+    }
+
+    summary.partidos.partido1 += Number(acta.votos?.partido1 || 0);
+    summary.partidos.partido2 += Number(acta.votos?.partido2 || 0);
+    summary.partidos.partido3 += Number(acta.votos?.partido3 || 0);
+    summary.partidos.partido4 += Number(acta.votos?.partido4 || 0);
+
+    summary.votosValidos += Number(acta.votos?.votos_validos || 0);
+    summary.votosBlancos += Number(acta.votos?.votos_blancos || 0);
+    summary.votosNulos += Number(acta.votos?.votos_nulos || 0);
+    summary.totalVotos += Number(acta.votos?.total_votos || 0);
+  }
+
+  return summary;
+}
+
+function buildDepartmentSummary() {
+  const actas = Array.from(actasRegistradas.values());
+  const departments = new Map();
+
+  for (const acta of actas) {
+    const departamento = getDepartamentoByCodigoTerritorial(acta.codigo_territorial);
+
+    if (!departments.has(departamento)) {
+      departments.set(departamento, {
+        departamento,
+        totalActas: 0,
+        validas: 0,
+        observadas: 0,
+        totalVotos: 0
+      });
+    }
+
+    const item = departments.get(departamento);
+
+    item.totalActas++;
+    item.totalVotos += Number(acta.votos?.total_votos || 0);
+
+    if (acta.estado_acta === "OBSERVADA_PENDIENTE_REVISION" || acta.requiere_revision_humana) {
+      item.observadas++;
+    } else {
+      item.validas++;
+    }
+  }
+
+  return Array.from(departments.values()).sort((a, b) => {
+    return b.totalActas - a.totalActas;
+  });
+}
+
+app.get("/api/oficial/dashboard/resumen", (req, res) => {
+  return res.json({
+    success: true,
+    data: buildDashboardSummary()
+  });
+});
+
+app.get("/api/oficial/dashboard/departamentos", (req, res) => {
+  return res.json({
+    success: true,
+    data: buildDepartmentSummary()
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Mock backend oficial ejecutándose en http://localhost:${PORT}`);
 });

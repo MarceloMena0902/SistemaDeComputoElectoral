@@ -4,5 +4,5 @@
   "defaultUserId": 1,
   "batchDelayMs": 0,
   "stopOnError": false,
-  "seleniumLimit": 100
+  "seleniumLimit": 0
 }

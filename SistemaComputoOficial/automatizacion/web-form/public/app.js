@@ -243,4 +243,64 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+const seleniumButton = document.getElementById("btn_run_selenium");
+const importButton = document.getElementById("btn_run_import");
+const automationMessage = document.getElementById("automation_message");
+
+function showAutomationMessage(type, text) {
+  automationMessage.className = `message ${type}`;
+  automationMessage.textContent = text;
+}
+
+async function runAutomation(endpoint, button, loadingText) {
+  try {
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = loadingText;
+
+    showAutomationMessage("info", "Proceso iniciado. Revisa la terminal y los logs.");
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showAutomationMessage("error", data.message || "No se pudo iniciar el proceso.");
+      return;
+    }
+
+    showAutomationMessage("success", data.message || "Proceso iniciado correctamente.");
+    button.textContent = originalText;
+    button.disabled = false;
+  } catch (error) {
+    showAutomationMessage("error", "No se pudo conectar con el servidor del formulario.");
+    button.disabled = false;
+  }
+}
+
+if (seleniumButton) {
+  seleniumButton.addEventListener("click", () => {
+    runAutomation(
+      "/api/automation/run-selenium",
+      seleniumButton,
+      "Ejecutando Selenium..."
+    );
+  });
+}
+
+if (importButton) {
+  importButton.addEventListener("click", () => {
+    runAutomation(
+      "/api/automation/run-import",
+      importButton,
+      "Ejecutando importación..."
+    );
+  });
+}
+
 updatePreview();

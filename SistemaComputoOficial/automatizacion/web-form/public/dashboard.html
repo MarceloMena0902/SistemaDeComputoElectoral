@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Oficial Electoral</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <main class="dashboard-page">
+    <header class="dashboard-header">
+      <div>
+        <p class="eyebrow">Sistema Nacional de Cómputo Electoral</p>
+        <h1>Dashboard Oficial de Actas</h1>
+        <p class="subtitle">
+          Monitoreo de actas válidas, observadas, votos y distribución territorial.
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <a href="/" class="secondary-button">Formulario</a>
+        <button id="btn-refresh" class="primary-button">Actualizar dashboard</button>
+      </div>
+    </header>
+
+    <section class="kpi-grid">
+      <article class="kpi-card">
+        <span>Total actas</span>
+        <strong id="kpi-total-actas">0</strong>
+      </article>
+
+      <article class="kpi-card success">
+        <span>Actas válidas</span>
+        <strong id="kpi-validas">0</strong>
+      </article>
+
+      <article class="kpi-card warning">
+        <span>Actas observadas</span>
+        <strong id="kpi-observadas">0</strong>
+      </article>
+
+      <article class="kpi-card danger">
+        <span>Total votos</span>
+        <strong id="kpi-total-votos">0</strong>
+      </article>
+    </section>
+
+    <section class="dashboard-grid">
+      <article class="panel map-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Mapa de Bolivia</h2>
+            <p>Distribución de actas oficiales por departamento.</p>
+          </div>
+          <span id="map-status" class="status-pill">Cargando mapa</span>
+        </div>
+
+        <div id="bolivia-map"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Resultados por partido</h2>
+            <p>Totales acumulados del cómputo oficial cargado.</p>
+          </div>
+        </div>
+
+        <div class="bars">
+          <div class="bar-row">
+            <span>Partido 1</span>
+            <div class="bar-track">
+              <div id="bar-p1" class="bar-fill"></div>
+            </div>
+            <strong id="txt-p1">0</strong>
+          </div>
+
+          <div class="bar-row">
+            <span>Partido 2</span>
+            <div class="bar-track">
+              <div id="bar-p2" class="bar-fill"></div>
+            </div>
+            <strong id="txt-p2">0</strong>
+          </div>
+
+          <div class="bar-row">
+            <span>Partido 3</span>
+            <div class="bar-track">
+              <div id="bar-p3" class="bar-fill"></div>
+            </div>
+            <strong id="txt-p3">0</strong>
+          </div>
+
+          <div class="bar-row">
+            <span>Partido 4</span>
+            <div class="bar-track">
+              <div id="bar-p4" class="bar-fill"></div>
+            </div>
+            <strong id="txt-p4">0</strong>
+          </div>
+        </div>
+
+        <div class="vote-summary">
+          <div>
+            <span>Votos válidos</span>
+            <strong id="txt-validos">0</strong>
+          </div>
+          <div>
+            <span>Blancos</span>
+            <strong id="txt-blancos">0</strong>
+          </div>
+          <div>
+            <span>Nulos</span>
+            <strong id="txt-nulos">0</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel table-panel">
+      <div class="panel-header">
+        <div>
+          <h2>Actas por departamento</h2>
+          <p>Resumen territorial generado desde el código territorial del acta.</p>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Departamento</th>
+              <th>Total actas</th>
+              <th>Válidas</th>
+              <th>Observadas</th>
+              <th>Total votos</th>
+            </tr>
+          </thead>
+          <tbody id="departments-table">
+            <tr>
+              <td colspan="5">Sin datos cargados todavía.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

@@ -60,7 +60,7 @@
 
           <label>
             Registrado por
-            <input id="registrado_por" name="registrado_por" type="number" value="1" required />
+            <input id="registrado_por" name="registrado_por" type="number" value="1" readonly required />
           </label>
         </div>
 
@@ -132,32 +132,58 @@
           </label>
         </div>
 
-        <h2>Observaciones y estado</h2>
+<h2>Observaciones y estado</h2>
 
-        <div class="grid">
-          <label>
-            Tipo Observación
-            <input id="tipo_observacion" name="tipo_observacion" type="text" value="SIN_OBSERVACION" />
-          </label>
+<div class="grid">
+  <label>
+    Tipo Observación
+    <select id="tipo_observacion" name="tipo_observacion">
+      <option value="SIN_OBSERVACION">SIN_OBSERVACION</option>
+      <option value="FALTA_DATOS_APERTURA_CIERRE">FALTA_DATOS_APERTURA_CIERRE</option>
+      <option value="MESA_EN_LUGAR_DISTINTO">MESA_EN_LUGAR_DISTINTO</option>
+      <option value="DOCUMENTO_GIRADO_90">DOCUMENTO_GIRADO_90</option>
+      <option value="DOCUMENTO_GIRADO_180">DOCUMENTO_GIRADO_180</option>
+      <option value="DOCUMENTO_GIRADO_270">DOCUMENTO_GIRADO_270</option>
+      <option value="DOCUMENTO_COMPRIMIDO">DOCUMENTO_COMPRIMIDO</option>
+      <option value="ACTA_ANULADA">ACTA_ANULADA</option>
+      <option value="FORMULARIO_NO_OFICIAL">FORMULARIO_NO_OFICIAL</option>
+      <option value="PAPELETAS_NO_AUTORIZADAS">PAPELETAS_NO_AUTORIZADAS</option>
+      <option value="DATOS_BORRADOS">DATOS_BORRADOS</option>
+      <option value="DATOS_CAMBIADOS">DATOS_CAMBIADOS</option>
+      <option value="ACTA_DUPLICADA">ACTA_DUPLICADA</option>
+      <option value="ACTA_CLONADA">ACTA_CLONADA</option>
+      <option value="MESA_NO_EXISTE">MESA_NO_EXISTE</option>
+      <option value="FECHA_INCORRECTA">FECHA_INCORRECTA</option>
+      <option value="ERROR_TRANSCRIPCION">ERROR_TRANSCRIPCION</option>
+      <option value="FALTA_FIRMA_HUELLA">FALTA_FIRMA_HUELLA</option>
+      <option value="AUSENCIA_DELEGADOS">AUSENCIA_DELEGADOS</option>
+      <option value="INCONSISTENCIA_ARITMETICA">INCONSISTENCIA_ARITMETICA</option>
+      <option value="OBSERVACION_GENERAL">OBSERVACION_GENERAL</option>
+    </select>
+  </label>
 
-          <label>
-            Estado Acta
-            <input id="estado_acta" name="estado_acta" type="text" value="VALIDA" />
-          </label>
+  <label>
+    Estado Acta
+    <select id="estado_acta" name="estado_acta">
+      <option value="VALIDA">VALIDA</option>
+      <option value="OBSERVADA_PENDIENTE_REVISION">OBSERVADA_PENDIENTE_REVISION</option>
+      <option value="RECHAZADA">RECHAZADA</option>
+    </select>
+  </label>
 
-          <label>
-            Requiere Revisión Humana
-            <select id="requiere_revision_humana" name="requiere_revision_humana">
-              <option value="false">No</option>
-              <option value="true">Sí</option>
-            </select>
-          </label>
-        </div>
+  <label>
+    Requiere Revisión Humana
+    <select id="requiere_revision_humana" name="requiere_revision_humana">
+      <option value="false">No</option>
+      <option value="true">Sí</option>
+    </select>
+  </label>
+</div>
 
-        <label class="full">
-          Observaciones / Transcripción
-          <textarea id="observaciones" name="observaciones" rows="4"></textarea>
-        </label>
+<label class="full-width">
+  Observaciones / Transcripción
+  <textarea id="observaciones" name="observaciones" rows="4"></textarea>
+</label>
 
         <textarea id="transcripcion" name="transcripcion" rows="4" style="display:none;"></textarea>
 
@@ -168,6 +194,22 @@
         </div>
 
         <button id="btn_registrar" type="submit">Registrar acta oficial</button>
+        <div class="automation-panel">
+        <h2>Automatización oficial</h2>
+        <p>
+          Ejecuta la carga visual con Selenium usando el Excel oficial y las reglas de validación del módulo.
+        </p>
+        
+        <button id="btn_run_selenium" type="button">
+          Ejecutar automatización Selenium
+        </button>
+
+        <!-- <button id="btn_run_import" type="button">
+          Ejecutar importación directa por API
+        </button> -->
+
+        <div id="automation_message" class="message"></div>
+      </div>
 
         <div id="message" class="message"></div>
       </form>
