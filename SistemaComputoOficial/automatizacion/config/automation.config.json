@@ -1,7 +1,8 @@
 {
-  "csvPath": "./data/actas_oficiales_transcripcion.csv",
+  "csvPath": "./data/oficial/actas_conteo.xlsx",
   "apiUrl": "http://localhost:4000/api/oficial/actas",
   "defaultUserId": 1,
-  "batchDelayMs": 50,
-  "stopOnError": false
+  "batchDelayMs": 0,
+  "stopOnError": false,
+  "seleniumLimit": 100
 }
