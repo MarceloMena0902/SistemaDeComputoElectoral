@@ -91,6 +91,11 @@ services:
       DATABASE_URL_READ: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-electoral2024}@haproxy:5001/computo_oficial
       SECRET_KEY: ${SECRET_KEY:-electoral-secret-key-2024}
       RUN_MIGRATIONS: "true"
+      CSV_PATH: /app/data/actas_oficiales_transcripcion.csv
+      SELENIUM_LIMIT: "15"
+      BULK_CONCURRENCY: "4"
+    volumes:
+      - ./automatizacion/data:/app/data:ro
     ports:
       - "4000:8000"   # Puerto 4000 externo → compatible con automatizacion existente
     networks:
