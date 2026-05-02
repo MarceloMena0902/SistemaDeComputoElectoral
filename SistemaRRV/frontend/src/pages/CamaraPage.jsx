@@ -6,7 +6,7 @@ export default function CamaraPage() {
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState(null)
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.100.6:8000'
+  const API_URL = import.meta.env.VITE_API_URL ||  'http://172.20.10.2:8000'
 
   const seleccionarArchivo = (e) => {
     const file = e.target.files[0]

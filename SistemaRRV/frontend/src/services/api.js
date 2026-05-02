@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://10.254.0.27:8000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://172.20.10.2:8000'
 
 async function fetchAPI(endpoint, options = {}) {
   const url = `${API_URL}${endpoint}`

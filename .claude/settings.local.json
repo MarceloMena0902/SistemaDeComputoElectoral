@@ -7,7 +7,9 @@
       "Read(//usr/**)",
       "Read(//usr/local/**)",
       "Bash(command -v python3)",
-      "Bash(/c/Users/Marcelo/AppData/Local/Microsoft/WindowsApps/python3 -c ' *)"
+      "Bash(/c/Users/Marcelo/AppData/Local/Microsoft/WindowsApps/python3 -c ' *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":5173 \\\\|:5174 \")"
     ]
   }
 }

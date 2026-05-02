@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { oficialActas as officialSeed } from './data/oficial.mock.js';
-import { rrvActas } from './data/rrv.mock.js';
-import { ENABLE_API_SUBMIT, apiInfo, getAuditoriaOficial, getProgresoOficial, getResultadosOficiales, healthOficial, registrarActaOficial } from './services/api.js';
+import { rrvActas as rrvMock } from './data/rrv.mock.js';
+import { ENABLE_API_SUBMIT, RRV_ENABLED, apiInfo, getAuditoriaOficial, getRrvActas, getProgresoOficial, getResultadosOficiales, healthOficial, registrarActaOficial } from './services/api.js';
 import {
   PARTIES,
   buildInconsistencias,
@@ -37,6 +37,8 @@ export default function App() {
   const [active, setActive] = useState('dashboard');
   const [customActas, setCustomActas] = useState(loadCustomActas);
   const [backendStatus, setBackendStatus] = useState({ checked: false, ok: false, label: 'sin comprobar' });
+  const [rrvActas, setRrvActas] = useState(rrvMock);
+  const [rrvStatus, setRrvStatus] = useState({ ok: false, label: RRV_ENABLED ? 'conectando...' : 'mock' });
 
   const oficialActas = useMemo(() => {
     const customMap = new Map(customActas.map((a) => [String(a.codigoActa), a]));
@@ -65,13 +67,27 @@ export default function App() {
 
   useEffect(() => { checkBackend(); }, []);
 
+  useEffect(() => {
+    if (!RRV_ENABLED) return;
+    getRrvActas(1000)
+      .then((data) => {
+        if (data.actas.length > 0) {
+          setRrvActas(data.actas);
+          setRrvStatus({ ok: true, label: `${data.actas.length} actas reales` });
+        } else {
+          setRrvStatus({ ok: true, label: 'RRV vacío — mock activo' });
+        }
+      })
+      .catch((e) => setRrvStatus({ ok: false, label: `Sin conexión — mock activo` }));
+  }, []);
+
   const page = {
-    dashboard: <Dashboard oficial={oficialActas} />,
+    dashboard: <Dashboard oficial={oficialActas} rrv={rrvActas} />,
     formulario: <Formulario oficial={oficialActas} onSave={saveCustomActa} backendStatus={backendStatus} onCheckBackend={checkBackend} />,
     actas: <ActasPage oficial={oficialActas} />,
-    inconsistencias: <InconsistenciasPage oficial={oficialActas} />,
+    inconsistencias: <InconsistenciasPage oficial={oficialActas} rrv={rrvActas} />,
     auditoria: <AuditoriaPage oficial={oficialActas} backendStatus={backendStatus} />,
-    integracion: <IntegracionPage backendStatus={backendStatus} onCheckBackend={checkBackend} />,
+    integracion: <IntegracionPage backendStatus={backendStatus} rrvStatus={rrvStatus} onCheckBackend={checkBackend} />,
   }[active];
 
   return (
@@ -93,8 +109,8 @@ export default function App() {
         </nav>
         <div className="sideStatus">
           <small>Estado de integración</small>
-          <div className="statusLine"><i className={backendStatus.ok ? 'dot ok' : 'dot warn'} /> Servicio oficial: {backendStatus.ok ? 'conectado' : 'modo demostración'}</div>
-          <div className="statusLine"><i className="dot info" /> RRV: datos demo hasta endpoint real</div>
+          <div className="statusLine"><i className={backendStatus.ok ? 'dot ok' : 'dot warn'} /> Oficial: {backendStatus.ok ? 'conectado' : 'modo demostración'}</div>
+          <div className="statusLine"><i className={rrvStatus.ok ? 'dot ok' : RRV_ENABLED ? 'dot warn' : 'dot info'} /> RRV: {rrvStatus.label}</div>
           <button className="miniButton" onClick={checkBackend}>Comprobar backend</button>
         </div>
       </aside>
@@ -255,10 +271,10 @@ function TerritoryResultsTable({ rows }) {
   </div>;
 }
 
-function Dashboard({ oficial }) {
+function Dashboard({ oficial, rrv }) {
   const [filters, setFilters] = useState({ proceso: 'Elecciones Subnacionales 2026', departamento: '', provincia: '', municipio: '', recinto: '', mesa: '', estado: '', fuente: '', q: '' });
   const oficialF = useMemo(() => filterActas(oficial, filters), [oficial, filters]);
-  const rrvF = useMemo(() => filterActas(rrvActas, filters), [filters]);
+  const rrvF = useMemo(() => filterActas(rrv, filters), [rrv, filters]);
   const kpis = useMemo(() => buildKpis(oficialF, rrvF), [oficialF, rrvF]);
   const compare = useMemo(() => compareParties(oficialF, rrvF), [oficialF, rrvF]);
   const deps = useMemo(() => departmentSummary(oficialF, rrvF), [oficialF, rrvF]);
@@ -272,7 +288,7 @@ function Dashboard({ oficial }) {
       <PageHeader eyebrow="Dashboard analítico" title="RRV vs Cómputo Oficial" subtitle="Vista comparativa para detectar diferencias entre MongoDB RRV y PostgreSQL oficial.">
         <button className="primary" onClick={() => exportJson('comparativo-rrv-vs-oficial.json', { kpis, compare, technical, inconsistencias: inconsistencias.slice(0, 80) })}>Exportar JSON</button>
       </PageHeader>
-      <Filters filters={filters} setFilters={setFilters} data={[...oficial, ...rrvActas]} title="Filtro territorial y de actas" />
+      <Filters filters={filters} setFilters={setFilters} data={[...oficial, ...rrv]} title="Filtro territorial y de actas" />
       <OepProgressPanel kpis={kpis} />
       <section className="kpiGrid">
         <Kpi icon="Ⓡ" label="Actas RRV" value={fmt(kpis.actasRRV)} hint="conteo rápido" />
@@ -705,8 +721,8 @@ function ResponsiveTable({ rows }) {
   return <div className="tableWrap"><table><thead><tr><th>Acta</th><th>Mesa</th><th>Departamento</th><th>Municipio</th><th>Recinto</th><th>Total</th><th>Estado</th><th>Nota técnica</th></tr></thead><tbody>{rows.map((a) => <tr key={a.codigoActa}><td><b>{a.nroActa}</b></td><td>{a.nroMesa}</td><td>{a.departamento}</td><td>{a.municipio}</td><td>{a.recinto}</td><td>{fmt(a.totalVotos)}</td><td><Pill tone={String(a.estado).includes('OBS') ? 'warning' : 'ok'}>{a.estado}</Pill></td><td>{a.observacionTecnica ? <Pill tone="warning">Sí</Pill> : <span className="mutedText">—</span>}</td></tr>)}</tbody></table></div>;
 }
 
-function InconsistenciasPage({ oficial }) {
-  const rows = useMemo(() => buildInconsistencias(oficial, rrvActas), [oficial]);
+function InconsistenciasPage({ oficial, rrv }) {
+  const rows = useMemo(() => buildInconsistencias(oficial, rrv), [oficial, rrv]);
   return <>
     <PageHeader eyebrow="Comparación" title="Inconsistencias RRV vs Oficial" subtitle="Diferencias campo por campo entre el documento RRV y el acta oficial.">
       <button className="primary" onClick={() => exportJson('inconsistencias-rrv-oficial.json', rows)}>Exportar</button>
@@ -736,21 +752,31 @@ function AuditoriaPage({ oficial, backendStatus }) {
   </>;
 }
 
-function IntegracionPage({ backendStatus, onCheckBackend }) {
+function IntegracionPage({ backendStatus, rrvStatus, onCheckBackend }) {
   return <>
     <PageHeader eyebrow="Documentación técnica" title="Integración con las bases de datos del equipo" subtitle="Este frontend no crea bases propias: consume PostgreSQL oficial y RRV MongoDB cuando esos servicios estén disponibles.">
       <button className="primary" onClick={onCheckBackend}>Probar backend oficial</button>
     </PageHeader>
     <section className="architecture">
-      <Card><h2>Base oficial PostgreSQL</h2><img src="/diagrama-postgresql-oficial.png" alt="Diagrama PostgreSQL oficial" /><p>Usada por el Formulario Oficial mediante los endpoints del backend oficial. Tablas principales: acta_oficial, voto_oficial, auditoria_voto, mesa_electoral.</p></Card>
-      <Card><h2>Base RRV MongoDB</h2><img src="/diagrama-mongodb-rrv.png" alt="Diagrama MongoDB RRV" /><p>Usada por el Dashboard Comparativo. En los ZIP actuales no aparece el backend/cluster Mongo completo, por eso el frontend trae mock reemplazable.</p></Card>
+      <Card>
+        <h2>Base oficial PostgreSQL</h2>
+        <img src="/diagrama-postgresql-oficial.png" alt="Diagrama PostgreSQL oficial" />
+        <p>Usada por el Formulario Oficial mediante los endpoints del backend oficial. Tablas principales: acta_oficial, voto_oficial, auditoria_voto, mesa_electoral.</p>
+        <Pill tone={backendStatus.ok ? 'ok' : 'danger'}>{backendStatus.ok ? 'Conectado' : 'No disponible'}</Pill>
+      </Card>
+      <Card>
+        <h2>Base RRV MongoDB</h2>
+        <img src="/diagrama-mongodb-rrv.png" alt="Diagrama MongoDB RRV" />
+        <p>Usada por el Dashboard Comparativo. Configura <code>VITE_RRV_API_URL</code> en el <code>.env</code> para conectar al cluster MongoDB real del SistemaRRV.</p>
+        <Pill tone={rrvStatus?.ok ? 'ok' : RRV_ENABLED ? 'danger' : 'neutral'}>{rrvStatus?.label || 'mock'}</Pill>
+      </Card>
     </section>
     <section className="heroGrid">
       <Card><h2>Endpoints esperados</h2><EndpointList /></Card>
       <Card><h2>Qué hace mi parte</h2><ul className="prettyList"><li>Formulario oficial visual y validado.</li><li>Payload compatible con <code>POST /api/oficial/actas</code>.</li><li>Dashboard comparativo RRV vs Oficial.</li><li>Inconsistencias campo por campo.</li><li>Auditoría visual y preparada para backend.</li></ul></Card>
       <Card><h2>Qué no hace mi parte</h2><ul className="prettyList"><li>No implementa OCR ni aplanado de PDF.</li><li>No implementa SMS ni app móvil.</li><li>No crea PostgreSQL Cluster ni MongoDB Cluster.</li><li>No hace n8n ni Selenium.</li><li>No reemplaza el backend oficial ni el backend RRV del equipo.</li></ul></Card>
     </section>
-    <Card><h2>Configuración detectada</h2><pre className="codeBlock">{JSON.stringify({ backendStatus, apiInfo }, null, 2)}</pre></Card>
+    <Card><h2>Configuración detectada</h2><pre className="codeBlock">{JSON.stringify({ backendStatus, rrvStatus, apiInfo }, null, 2)}</pre></Card>
   </>;
 }
 
