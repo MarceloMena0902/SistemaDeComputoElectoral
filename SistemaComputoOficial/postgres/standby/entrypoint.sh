@@ -27,9 +27,8 @@ echo "[STANDBY] Primary listo. Procediendo..."
 if [ ! -f "$PGDATA/PG_VERSION" ]; then
     echo "[STANDBY] PGDATA vacio. Ejecutando pg_basebackup desde PRIMARY..."
 
-    rm -rf "$PGDATA"
-    mkdir -p "$PGDATA"
-    chmod 700 "$PGDATA"
+    rm -rf "$PGDATA"/* "$PGDATA"/.[!.]* 2>/dev/null || true
+        chmod 700 "$PGDATA"
 
     PGPASSWORD="$REPL_PASS" pg_basebackup \
         -h "$PRIMARY_HOST" \
@@ -68,4 +67,5 @@ bash /watchdog.sh &
 
 # ─── 4. Iniciar PostgreSQL en modo standby ────────────────────────
 echo "[STANDBY] Iniciando PostgreSQL..."
-exec postgres -D "$PGDATA"
+chown -R postgres:postgres "$PGDATA"
+exec gosu postgres postgres -D "$PGDATA"

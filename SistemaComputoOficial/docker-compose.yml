@@ -87,7 +87,6 @@ services:
     environment:
       # Conexion de escritura → va por HAProxy puerto 5000 (solo primary)
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-electoral2024}@haproxy:5000/computo_oficial
-      # Conexion de lectura → va por HAProxy puerto 5001 (cualquier nodo)
       DATABASE_URL_READ: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-electoral2024}@haproxy:5001/computo_oficial
       SECRET_KEY: ${SECRET_KEY:-electoral-secret-key-2024}
       RUN_MIGRATIONS: "true"
@@ -100,9 +99,6 @@ services:
       - "4000:8000"   # Puerto 4000 externo → compatible con automatizacion existente
     networks:
       - electoral-net
-    depends_on:
-      postgres-primary:
-        condition: service_healthy
     restart: unless-stopped
 
 # ─── Volumes Persistentes ────────────────────────────────────

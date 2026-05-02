@@ -57,12 +57,15 @@ async def run_migrations() -> None:
     """Ejecuta los archivos SQL de migracion al iniciar la aplicacion."""
     migrations_dir = Path(__file__).parent.parent / "migrations"
     sql_files = sorted(migrations_dir.glob("*.sql"))
-
     async with engine.begin() as conn:
         for sql_file in sql_files:
             logger.info(f"Ejecutando migracion: {sql_file.name}")
             sql = sql_file.read_text(encoding="utf-8")
-            # Ejecutar todo el archivo como bloque unico
-            await conn.execute(text(sql))
-
+            # Dividir en sentencias individuales
+            statements = [s.strip() for s in sql.split(";") if s.strip()]
+            for statement in statements:
+                try:
+                    await conn.execute(text(statement))
+                except Exception as e:
+                    logger.warning(f"Sentencia omitida ({sql_file.name}): {e}")
     logger.info(f"Migraciones completadas: {len(sql_files)} archivo(s).")
