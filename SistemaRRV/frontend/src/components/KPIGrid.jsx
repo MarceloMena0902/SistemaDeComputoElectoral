@@ -1,74 +1,50 @@
-import { useEffect, useRef } from 'react'
-import { kpis, fmt } from '../data/rrv'
-
-const actasPct = (kpis.actasRecibidas / kpis.actasTotal * 100)
-
-const KPIS = [
-  {
-    label: 'Actas procesadas',
-    value: fmt.n(kpis.actasRecibidas),
-    unit: `/ ${fmt.n(kpis.actasTotal)}`,
-    barW: actasPct,
-    sub: [`${actasPct.toFixed(1)}% completado`, '+12 / min'],
-  },
-  {
-    label: 'Votos contabilizados',
-    value: fmt.n(kpis.votosProcesados / 1000),
-    unit: 'mil',
-    barW: 74,
-    sub: ['74% del padrón estimado', '↗'],
-  },
-  {
-    label: 'Participación',
-    value: kpis.participacion,
-    unit: '%',
-    barW: kpis.participacion,
-    sub: ['turnout estimado', '+0.4 vs 2020'],
-  },
-  {
-    label: 'Latencia mediana',
-    value: kpis.latenciaSeg,
-    unit: 's',
-    barW: 38,
-    sub: ['captura → publicación', 'SLA <5s ✓'],
-  },
-]
+// src/components/KPIGrid.jsx
+import { useEffect, useState } from 'react'
+import { api } from '../services/api'
 
 export default function KPIGrid() {
-  const fillRefs = useRef([])
+  const [metrics, setMetrics] = useState({
+    total_actas: 0,
+    procesadas: 0,
+    pendientes: 0,
+    errores: 0
+  })
+
+  const fetchMetrics = async () => {
+    try {
+      const data = await api.getMetricas()
+      setMetrics({
+        total_actas: data.total_actas || 0,
+        procesadas: data.procesadas || 0,
+        pendientes: data.pendientes || 0,
+        errores: data.errores || 0,
+        revision_humana: data.revision_humana || 0
+      })
+    } catch (error) {
+      console.error('Error fetching metrics:', error)
+    }
+  }
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      fillRefs.current.forEach((el, i) => {
-        if (el) el.style.width = KPIS[i].barW + '%'
-      })
-    })
-    return () => cancelAnimationFrame(frame)
+    fetchMetrics()
+    const interval = setInterval(fetchMetrics, 5000)
+    return () => clearInterval(interval)
   }, [])
 
+  const metricsList = [
+    { label: 'TODAS', value: metrics.total_actas, note: '100.0% del total', color: '#94A3B8' },
+    { label: 'PROCESADAS', value: metrics.procesadas, note: `${((metrics.procesadas / metrics.total_actas) * 100).toFixed(1) || 0}%`, color: '#16A34A' },
+    { label: 'PENDIENTES', value: metrics.pendientes, note: `${((metrics.pendientes / metrics.total_actas) * 100).toFixed(1) || 0}%`, color: '#2563EB' },
+    { label: 'ERRORES', value: metrics.errores, note: `${((metrics.errores / metrics.total_actas) * 100).toFixed(1) || 0}%`, color: '#DC2626' }
+  ]
+
   return (
-    <div className="kpi-grid" style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-      gap: 16,
-    }}>
-      {KPIS.map((k, i) => (
-        <div key={k.label} className="kpi">
-          <div className="kpi__label">{k.label}</div>
-          <div className="kpi__value">
-            {k.value}<span className="unit">{k.unit}</span>
-          </div>
-          <div className="kpi__bar">
-            <div
-              className="kpi__bar-fill"
-              ref={el => fillRefs.current[i] = el}
-              style={{ width: 0 }}
-            />
-          </div>
-          <div className="kpi__sub">
-            <span>{k.sub[0]}</span>
-            <span>{k.sub[1]}</span>
-          </div>
+    <div className="kpi-grid">
+      {metricsList.map(m => (
+        <div key={m.label} className="kpi" style={{ '--kpi-color': m.color }}>
+          <span>{m.label}</span>
+          <strong>{m.value}</strong>
+          <small>{m.note}</small>
         </div>
       ))}
     </div>

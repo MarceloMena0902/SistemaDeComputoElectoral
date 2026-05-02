@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+// src/App.jsx
+import { useEffect, useState } from 'react'
 import Sidebar, { NAV } from './components/Sidebar'
 import Header from './components/Header'
 import TweaksPanel from './components/TweaksPanel'
 import Dashboard from './pages/Dashboard'
+import CamaraPage from './pages/CamaraPage'
 import { departments } from './data/rrv'
 import {
   ActasPage,
@@ -12,6 +14,7 @@ import {
   PipelinePage,
   TransparenciaPage,
 } from './pages/OperationalPages'
+import { initializeData } from './data/rrv'
 
 const viewMeta = {
   inicio: {
@@ -37,6 +40,13 @@ const viewMeta = {
     eyebrowFirst: true,
     titleAccent: '#3B82F6',
     subtitle: 'Stream en vivo desde recintos - OCR + SMS',
+  },
+  camara: {
+    title: 'Capturar Acta',
+    eyebrow: 'Cámara',
+    eyebrowFirst: true,
+    titleAccent: '#10B981',
+    subtitle: 'Toma una foto del acta electoral para procesarla',
   },
   dept: {
     title: '',
@@ -76,12 +86,23 @@ export default function App() {
   const [tweaksOpen, setTweaksOpen] = useState(false)
   const [activeView, setActiveView] = useState(getHashView)
   const [locationHash, setLocationHash] = useState(() => window.location.hash)
+  const [dataLoaded, setDataLoaded] = useState(false)
 
   const setTheme = t => {
     setThemeState(t)
     document.documentElement.setAttribute('data-theme', t)
     localStorage.setItem('rrv-theme', t)
   }
+
+  useEffect(() => {
+    const loadData = async () => {
+      console.log('🚀 Inicializando datos desde el backend...')
+      await initializeData()
+      setDataLoaded(true)
+      console.log('✅ Datos cargados correctamente')
+    }
+    loadData()
+  }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -98,28 +119,42 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  const headerMeta = useMemo(() => {
-    if (activeView !== 'dept') return viewMeta[activeView]
-    const dept = getHashDept()
-    return {
-      ...viewMeta.dept,
-      eyebrow: dept.name,
-      subtitle: `Detalle por departamento - analisis profundo`,
+  const headerMeta = () => {
+    if (activeView === 'dept') {
+      const dept = getHashDept()
+      return {
+        ...viewMeta.dept,
+        eyebrow: dept?.name || 'Departamento',
+        subtitle: `Detalle por departamento - analisis profundo`,
+      }
     }
-  }, [activeView, locationHash])
+    return viewMeta[activeView] || viewMeta.dashboard
+  }
 
-  const page = useMemo(() => {
+  const page = () => {
+    if (!dataLoaded) {
+      return (
+        <div className="loading-screen" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <div style={{ textAlign: 'center' }}>
+            <h2>Cargando datos electorales...</h2>
+            <p>Conectando con el servidor...</p>
+          </div>
+        </div>
+      )
+    }
+    
     const views = {
       inicio: <InicioPage />,
       dashboard: <Dashboard />,
       mapa: <MapaPage />,
       actas: <ActasPage />,
+      camara: <CamaraPage />,
       dept: <DeptPage key={locationHash} />,
       pipeline: <PipelinePage />,
       transp: <TransparenciaPage />,
     }
     return views[activeView] || views.dashboard
-  }, [activeView, locationHash])
+  }
 
   return (
     <div className="app-shell">
@@ -129,10 +164,10 @@ export default function App() {
           theme={theme}
           setTheme={setTheme}
           onTweaksToggle={() => setTweaksOpen(open => !open)}
-          {...headerMeta}
+          {...headerMeta()}
         />
         <div className="view-shell">
-          {page}
+          {page()}
         </div>
       </main>
       <TweaksPanel
