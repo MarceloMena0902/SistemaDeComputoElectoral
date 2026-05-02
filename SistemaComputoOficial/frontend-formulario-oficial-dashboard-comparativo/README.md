@@ -366,3 +366,20 @@ git push origin feature/formulario-oficial-dashboard-comparativo
 ```txt
 My responsibility was to develop the official form and the comparative dashboard. The form validates official electoral records before sending them to the official PostgreSQL backend. The dashboard compares preliminary RRV data from MongoDB with official results from PostgreSQL, showing differences, inconsistencies, participation indicators, audit information, and technical observations such as flattened or cropped PDF records when those notes are provided by the data source.
 ```
+
+## Actualización: formulario con combos dependientes y control anti doble carga
+
+El formulario oficial fue reforzado para evitar datos incorrectos escritos manualmente en la ubicación territorial. Ahora la selección se hace por listas dependientes:
+
+Departamento → Provincia → Municipio → Recinto → Mesa / Acta.
+
+Solo el departamento aparece habilitado al inicio. Al seleccionar cada nivel, se habilita el siguiente. Si el usuario cambia un nivel superior, los niveles inferiores se limpian automáticamente.
+
+También se agregó control anti doble carga:
+
+- El botón **Guardar acta** se bloquea mientras procesa.
+- La tecla **Enter** ejecuta el mismo guardado del botón.
+- Aparece una pantalla emergente de validación/proceso/resultado.
+- Si existen errores críticos, se muestra el detalle y no se registra el acta como válida.
+
+Esto es solo del frontend de Formulario Oficial y Dashboard Comparativo; la persistencia real depende del backend oficial configurado por `.env`.

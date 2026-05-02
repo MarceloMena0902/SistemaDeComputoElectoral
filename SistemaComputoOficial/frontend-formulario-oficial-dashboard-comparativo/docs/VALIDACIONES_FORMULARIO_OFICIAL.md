@@ -1,67 +1,44 @@
 # Validaciones del Formulario Oficial
 
-Este módulo valida la captura oficial antes de permitir el guardado local o el envio al backend oficial.
+Este módulo corresponde al **Formulario Oficial y Dashboard Comparativo**. No implementa bases de datos, OCR, SMS, Selenium ni carga masiva. Consume los servicios del backend oficial y del RRV cuando estén disponibles.
 
-## Campos numéricos
+## Controles del formulario
 
-Los campos de códigos, mesa, votantes, papeletas y votos:
+- Los campos numéricos solo aceptan dígitos.
+- No se permiten letras, decimales, negativos, signos ni notación científica en campos de votos, mesa, códigos, papeletas o habilitados.
+- El botón **Guardar acta** queda bloqueado mientras se procesa el registro para evitar doble carga.
+- La tecla **Enter** ejecuta el mismo flujo del botón Guardar acta cuando el foco está en campos simples.
+- Se muestra una pantalla emergente de proceso, éxito o error para que el usuario no presione varias veces.
 
-- solo aceptan dígitos `0-9`,
-- no aceptan letras,
-- no aceptan decimales,
-- no aceptan signos negativos,
-- no aceptan notación científica como `1e5`,
-- se limpian visualmente al pegar contenido inválido.
+## Combos dependientes
 
-## Campos obligatorios
+La ubicación del acta se selecciona mediante listas desplegables para evitar texto escrito incorrectamente.
 
-Son obligatorios:
+Orden de desbloqueo:
 
-- número de acta,
-- código de mesa,
-- número de mesa,
-- código territorial,
-- votantes habilitados,
-- departamento,
-- provincia,
-- municipio,
-- recinto,
-- registrado por ID.
+1. Departamento
+2. Provincia
+3. Municipio
+4. Recinto
+5. Mesa / acta
+
+Al cambiar un nivel superior, los niveles inferiores se limpian automáticamente.
 
 ## Reglas electorales
 
-El formulario calcula:
+- Campos obligatorios: acta, mesa, código territorial, votantes habilitados, ubicación y usuario registrador.
+- `P1 + P2 + P3 + P4` calcula votos válidos.
+- `votos válidos + blancos + nulos` calcula total de votos.
+- El total de votos no puede superar votantes habilitados.
+- Si hay observación técnica, el acta queda como advertencia para trazabilidad.
+- Si hay errores críticos, no se guarda como válida.
 
-```txt
-votos_validos = P1 + P2 + P3 + P4
+## Integración
 
-total_votos = votos_validos + votos_blancos + votos_nulos
+El frontend no escribe directamente en PostgreSQL ni MongoDB. El envío real se activa por variables de entorno cuando el backend esté listo:
+
+```env
+VITE_OFICIAL_API_URL=http://localhost:4000
+VITE_RRV_API_URL=http://localhost:4001
+VITE_ENABLE_API_SUBMIT=true
 ```
-
-Luego valida:
-
-```txt
-total_votos <= votantes_habilitados
-
-total_votos == papeletas_anfora
-
-papeletas_anfora + papeletas_no_utilizadas == votantes_habilitados
-```
-
-## Estados
-
-- `PROCESADA`: no tiene errores ni advertencias.
-- `OBSERVADA`: tiene advertencias o nota técnica informativa.
-- `RECHAZADA`: tiene errores críticos y no se puede guardar.
-
-## Observación técnica
-
-La observación técnica no invalida por sí sola el acta. Solo se muestra para trazabilidad cuando llega información como:
-
-- `Aplanado ***`,
-- `Recortado 2 cm por lado`,
-- `Cambio de A4 a A0`,
-- `Cambio nulos por blancos`,
-- `Mesas que no existen`.
-
-El frontend no procesa PDF ni OCR. Solo muestra esa observación si viene desde el Excel, RRV o backend.
