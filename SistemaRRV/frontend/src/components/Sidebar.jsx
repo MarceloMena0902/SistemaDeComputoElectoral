@@ -3,6 +3,7 @@ export const NAV = [
   { id: 'dashboard', label: 'Dashboard', d: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z' },
   { id: 'mapa', label: 'Mapa por ciudad', d: 'M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z M9 3v15 M15 6v15' },
   { id: 'actas', label: 'Actas recibidas', d: 'M5 3h11l4 4v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M16 3v4h4 M8 13h8 M8 17h8 M8 9h3' },
+  { id: 'camara', label: 'Subir foto acta', d: 'M4 8.5h3l1.2-2h7.6l1.2 2h3v9H4z M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z' },
   { id: 'dept', label: 'Detalle dept.', d: 'M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14 2 9.27l6.91-1.01z' },
   { id: 'pipeline', label: 'Como funciona', d: 'M12 2v4 M12 18v4 M4.93 4.93l2.83 2.83 M16.24 16.24l2.83 2.83 M2 12h4 M18 12h4 M4.93 19.07l2.83-2.83 M16.24 7.76l2.83-2.83' },
   { id: 'transp', label: 'Transparencia', d: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
@@ -49,7 +50,7 @@ export default function Sidebar({ activeView }) {
           fontFamily: 'var(--font-mono)', fontSize: '10.5px',
           color: 'var(--text-faint)', letterSpacing: '0.08em',
         }}>
-          v1.4.2 - BUILD 2026-04-26
+          v1.4.2 - BUILD 2026-05-02
         </div>
       </div>
     </aside>

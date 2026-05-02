@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle Departamento · RRV Bolivia</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+  <style>
+    .dept-hero {
+      position: relative;
+      padding: 60px 32px 50px;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .dept-hero__bg {
+      position: absolute; inset: 0;
+      pointer-events: none;
+      opacity: 0.6;
+      z-index: 0;
+    }
+    .dept-hero__inner {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) 320px;
+      gap: 40px;
+      align-items: end;
+    }
+    .dept-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      color: var(--text-faint);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    .dept-eyebrow a { color: var(--accent); }
+    .dept-name {
+      font-family: var(--font-display);
+      font-size: clamp(72px, 9vw, 160px);
+      line-height: 0.85;
+      letter-spacing: -0.03em;
+      margin-top: 16px;
+    }
+    .dept-name em { font-style: italic; color: var(--accent); }
+    .dept-summary {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 22px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-top: 20px;
+      max-width: 600px;
+    }
+    .dept-mini-svg {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      padding: 24px;
+      height: 280px;
+      display: grid;
+      place-items: center;
+    }
+    .dept-mini-svg svg { width: 100%; height: 100%; }
+
+    .dept-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .dept-stat {
+      padding: 28px 28px;
+      border-right: 1px solid var(--border);
+    }
+    .dept-stat:last-child { border-right: none; }
+    .dept-stat label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .dept-stat .v {
+      font-family: var(--font-display);
+      font-size: clamp(40px, 4vw, 60px);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      margin-top: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+    .dept-stat .v em { font-style: italic; color: var(--accent); }
+    .dept-stat .desc {
+      color: var(--text-muted);
+      font-size: 12.5px;
+      margin-top: 8px;
+    }
+
+    .dept-content {
+      padding: 40px 32px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 22px;
+    }
+    .dept-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      padding: 28px;
+    }
+    .dept-card__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 22px;
+    }
+
+    /* Donut chart */
+    .donut {
+      width: 280px;
+      height: 280px;
+      margin: 12px auto 18px;
+      position: relative;
+    }
+    .donut svg { transform: rotate(-90deg); }
+    .donut-center {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+    .donut-center label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+    }
+    .donut-center .pct {
+      font-family: var(--font-display);
+      font-size: 56px;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-top: 4px;
+    }
+    .donut-center .who {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 18px;
+      margin-top: 4px;
+    }
+
+    .ciudades-list { margin-top: 14px; }
+    .ciudad-row {
+      display: grid;
+      grid-template-columns: 24px 1fr 90px;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px dashed var(--border);
+      font-family: var(--font-display);
+    }
+    .ciudad-row:last-child { border-bottom: none; }
+    .ciudad-rank {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .ciudad-name {
+      font-size: 17px;
+      letter-spacing: -0.01em;
+      display: flex;
+      flex-direction: column;
+    }
+    .ciudad-name small {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .ciudad-pct {
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Comparison vs national */
+    .compare-bar {
+      margin-top: 18px;
+    }
+    .compare-bar__row {
+      padding: 14px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .compare-bar__row:last-child { border-bottom: none; }
+    .compare-bar__head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .compare-bar__name {
+      font-family: var(--font-display);
+      font-size: 16px;
+      letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .compare-bar__name span { width: 9px; height: 9px; border-radius: 2px; }
+    .compare-bar__delta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+    .compare-bar__delta.pos { background: rgba(16, 185, 129, 0.1); color: #10B981; }
+    .compare-bar__delta.neg { background: rgba(220, 38, 38, 0.1); color: #DC2626; }
+    .compare-bar__bars {
+      display: flex; flex-direction: column; gap: 5px;
+      font-family: var(--font-mono); font-size: 11px;
+    }
+    .compare-bar__line {
+      display: grid;
+      grid-template-columns: 60px 1fr 50px;
+      align-items: center;
+      gap: 10px;
+    }
+    .compare-bar__line label { color: var(--text-faint); }
+    .compare-bar__line .track {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    [data-theme="light"] .compare-bar__line .track { background: rgba(15, 23, 42, 0.06); }
+    .compare-bar__line .fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .compare-bar__line .pct { text-align: right; color: var(--text); }
+
+    /* Recent actas */
+    .recent-actas {
+      max-height: 380px;
+      overflow: auto;
+    }
+    .recent-actas__row {
+      display: grid;
+      grid-template-columns: 90px 1fr 90px 70px;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px dashed var(--border);
+      align-items: center;
+      font-size: 12px;
+    }
+    .recent-actas__row .id { font-family: var(--font-mono); color: var(--accent); }
+    .recent-actas__row .recinto { color: var(--text); }
+    .recent-actas__row .estado { font-size: 11px; }
+    .recent-actas__row .hora { font-family: var(--font-mono); color: var(--text-faint); text-align: right; }
+
+    /* Hourly trend */
+    .trend-chart {
+      height: 180px;
+      margin-top: 18px;
+      position: relative;
+    }
+    .trend-chart svg { width: 100%; height: 100%; overflow: visible; }
+    .trend-chart .axis { stroke: var(--border); stroke-width: 1; }
+    .trend-chart .axis-label { font-family: var(--font-mono); font-size: 10px; fill: var(--text-faint); letter-spacing: 0.1em; }
+    .trend-chart .area { opacity: 0.18; }
+    .trend-chart .line { fill: none; stroke-width: 2; }
+    .trend-chart .dot { fill: var(--accent); }
+
+    @media (max-width: 1100px) {
+      .dept-hero__inner { grid-template-columns: 1fr; }
+      .dept-stats { grid-template-columns: repeat(2, 1fr); }
+      .dept-stat:nth-child(2) { border-right: none; }
+      .dept-content { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <main class="main">
+      <div id="header-mount"></div>
+      <div id="root"></div>
+    </main>
+  </div>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/shell.js"></script>
+  <script>
+  (function () {
+    const D = window.RRV;
+    const f = D.fmt;
+
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id') || 'BO-L';
+    const dept = D.departments.find(d => d.id === id) || D.departments[0];
+    const lead = D.partyById(dept.leader);
+
+    document.getElementById('header-mount').innerHTML = RRVShell.renderHeader({
+      title: `<em>${dept.name}</em>`,
+      sub: 'Detalle por departamento — análisis profundo',
+    });
+    RRVShell.initShell('departamento.html');
+
+    // Generate fake cities
+    const ciudades = (() => {
+      const seed = ['El Alto', dept.capital, 'Viacha', 'Mecapaca', 'Achocalla'];
+      const base = dept.votos / seed.length;
+      return seed.map((c, i) => ({
+        nombre: c,
+        votos: Math.round(base * (1.4 - i * 0.18)),
+        pct: dept.pct[dept.leader] + (Math.random() - 0.5) * 6,
+        actas: Math.round(dept.actas / seed.length * (1.3 - i * 0.15)),
+      }));
+    })();
+
+    // Total margins
+    const sortedPct = Object.entries(dept.pct).sort((a, b) => b[1] - a[1]);
+    const margin = sortedPct[0][1] - sortedPct[1][1];
+    const actasPct = dept.actas / dept.mesas * 100;
+
+    // Trend simulated 12 hours
+    const trend = Array.from({length: 13}, (_, i) => {
+      const hour = 8 + i;
+      const totalActas = Math.round(dept.actas * (i / 12) * (0.3 + 0.7 * Math.min(i / 12, 1)));
+      return { hour, actas: totalActas, pct: 35 + Math.sin(i * 0.4) * 4 + Math.random() * 2 };
+    });
+
+    document.getElementById('root').innerHTML = `
+      <section class="dept-hero">
+        <div class="dept-hero__bg" style="background: radial-gradient(ellipse 60% 80% at 30% 50%, ${lead.color}22, transparent 70%);"></div>
+        <div class="dept-hero__inner">
+          <div>
+            <div class="dept-eyebrow">
+              <a href="mapa.html">← Volver al mapa</a>
+              <span>${dept.id}</span>
+              <span>CAPITAL · ${dept.capital.toUpperCase()}</span>
+            </div>
+            <div class="dept-name">${dept.name}</div>
+            <div class="dept-summary">
+              ${lead.name} lidera con <em style="font-style:italic; color:${lead.color}">${dept.pct[dept.leader].toFixed(1)}%</em> de los votos preliminares en este departamento. Margen sobre el segundo lugar: <em style="font-style:italic; color:var(--accent)">+${margin.toFixed(1)} pp</em>.
+            </div>
+          </div>
+          <div class="dept-mini-svg" id="miniSvg"></div>
+        </div>
+      </section>
+
+      <div class="dept-stats">
+        <div class="dept-stat">
+          <label>Votos preliminares</label>
+          <div class="v">${f.n(dept.votos)}</div>
+          <div class="desc">contabilizados</div>
+        </div>
+        <div class="dept-stat">
+          <label>Actas procesadas</label>
+          <div class="v"><em>${actasPct.toFixed(1)}</em><span style="font-size:0.5em">%</span></div>
+          <div class="desc">${f.n(dept.actas)} de ${f.n(dept.mesas)} mesas</div>
+        </div>
+        <div class="dept-stat">
+          <label>Margen del líder</label>
+          <div class="v"><em>+${margin.toFixed(1)}</em><span style="font-size:0.4em"> pp</span></div>
+          <div class="desc">sobre el segundo lugar</div>
+        </div>
+        <div class="dept-stat">
+          <label>Participación</label>
+          <div class="v">${dept.participacion}<span style="font-size:0.5em">%</span></div>
+          <div class="desc">turnout estimado</div>
+        </div>
+      </div>
+
+      <div class="dept-content">
+        <!-- LEFT COLUMN -->
+        <div style="display: flex; flex-direction: column; gap: 22px;">
+
+          <!-- Donut + distribution -->
+          <div class="dept-card">
+            <div class="dept-card__head">
+              <div>
+                <div class="card-title">Distribución <em>de votos</em></div>
+                <div class="card-sub">Por partido · ${dept.name}</div>
+              </div>
+              <span class="badge badge--info">PRELIMINAR</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 280px 1fr; gap: 30px; align-items: center;">
+              <div class="donut">
+                <svg width="280" height="280" viewBox="0 0 280 280">
+                  ${(() => {
+                    let cum = 0;
+                    const r = 110, c = 140;
+                    return D.parties.map(p => {
+                      const len = dept.pct[p.id];
+                      const off = -cum * 2 * Math.PI * r / 100;
+                      const dasharray = `${len * 2 * Math.PI * r / 100} ${(100 - len) * 2 * Math.PI * r / 100}`;
+                      cum += len;
+                      return `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${p.color}" stroke-width="40" stroke-dasharray="${dasharray}" stroke-dashoffset="${off}"/>`;
+                    }).join('');
+                  })()}
+                </svg>
+                <div class="donut-center">
+                  <label>LÍDER</label>
+                  <div class="pct" style="color:${lead.color}">${dept.pct[dept.leader].toFixed(0)}%</div>
+                  <div class="who">${lead.name}</div>
+                </div>
+              </div>
+
+              <div>
+                ${sortedPct.map(([pid, pct]) => {
+                  const p = D.partyById(pid);
+                  const max = sortedPct[0][1];
+                  return `
+                    <div class="party-row">
+                      <div class="party-row__head">
+                        <div class="party-row__name">
+                          <span class="party-row__chip" style="background:${p.color}"></span>
+                          <strong>${p.name}</strong>
+                          <span>${p.tag}</span>
+                        </div>
+                        <div class="party-row__pct" style="color:${p.color}">${pct.toFixed(1)}<span style="font-size:12px; color:var(--text-faint)">%</span></div>
+                      </div>
+                      <div class="party-row__bar">
+                        <div class="party-row__fill" style="background:${p.color}; width:0;" data-w="${(pct/max)*100}"></div>
+                      </div>
+                      <div class="party-row__meta">
+                        <span>${f.n(Math.round(dept.votos * pct / 100))} votos</span>
+                        <span>${dept.leader === pid ? 'LÍDER' : '·'}</span>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+
+          <!-- Hourly trend -->
+          <div class="dept-card">
+            <div class="dept-card__head">
+              <div>
+                <div class="card-title">Llegada de actas <em>por hora</em></div>
+                <div class="card-sub">Captura · validación · publicación</div>
+              </div>
+              <span class="eyebrow">${dept.actas} ACTAS</span>
+            </div>
+            <div class="trend-chart" id="trendChart"></div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div style="display: flex; flex-direction: column; gap: 22px;">
+
+          <div class="dept-card">
+            <div class="card-title">Por <em>ciudad</em></div>
+            <div class="card-sub">Top localidades del departamento</div>
+            <div class="ciudades-list">
+              ${ciudades.map((c, i) => `
+                <div class="ciudad-row">
+                  <span class="ciudad-rank">#${String(i+1).padStart(2,'0')}</span>
+                  <div class="ciudad-name">
+                    ${c.nombre}
+                    <small>${f.n(c.actas)} actas · ${f.n(c.votos)} votos</small>
+                  </div>
+                  <div class="ciudad-pct" style="color:${lead.color}">${c.pct.toFixed(1)}%</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Compare vs national -->
+          <div class="dept-card">
+            <div class="card-title">${dept.name} <em>vs.</em> nacional</div>
+            <div class="card-sub">Diferencia respecto al promedio nacional</div>
+            <div class="compare-bar">
+              ${D.parties.map(p => {
+                const local = dept.pct[p.id];
+                const nat = D.national.parties.find(x => x.id === p.id).pct;
+                const delta = local - nat;
+                const max = Math.max(local, nat);
+                return `
+                  <div class="compare-bar__row">
+                    <div class="compare-bar__head">
+                      <div class="compare-bar__name"><span style="background:${p.color}"></span>${p.name}</div>
+                      <span class="compare-bar__delta ${delta >= 0 ? 'pos' : 'neg'}">${delta >= 0 ? '+' : ''}${delta.toFixed(1)} pp</span>
+                    </div>
+                    <div class="compare-bar__bars">
+                      <div class="compare-bar__line">
+                        <label>${dept.code}</label>
+                        <div class="track"><div class="fill" style="width:0; background:${p.color}" data-w="${(local/max)*100}"></div></div>
+                        <span class="pct">${local.toFixed(1)}%</span>
+                      </div>
+                      <div class="compare-bar__line">
+                        <label>NAC</label>
+                        <div class="track"><div class="fill" style="width:0; background:${p.color}; opacity:.4" data-w="${(nat/max)*100}"></div></div>
+                        <span class="pct" style="color:var(--text-faint)">${nat.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Recent actas -->
+          <div class="dept-card">
+            <div class="card-title">Actas <em>recientes</em></div>
+            <div class="card-sub">Últimas registradas en ${dept.name}</div>
+            <div class="recent-actas">
+              ${D.actas.filter((_, i) => i < 12).map(a => {
+                const e = D.estadoColores[a.estado];
+                return `
+                  <div class="recent-actas__row">
+                    <span class="id">${a.id}</span>
+                    <span class="recinto">${a.recinto}</span>
+                    <span class="estado-badge" style="background:${e.bg}; color:${e.fg}; font-size:10px;">${a.estado}</span>
+                    <span class="hora">${a.hora}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            <a href="actas.html?ciudad=${encodeURIComponent(dept.name)}" class="btn" style="width:100%; justify-content:center; margin-top: 14px;">Ver todas las actas →</a>
+          </div>
+
+        </div>
+      </div>
+
+      <div style="padding: 0 32px 60px;">
+        <div class="disclaimer">⚠ Datos preliminares NO oficiales · Generados a partir del flujo RRV · El cómputo oficial corre por separado.</div>
+      </div>
+    `;
+
+    // Mini SVG of just this department
+    fetch('assets/bolivia.svg').then(r => r.text()).then(svg => {
+      const host = document.getElementById('miniSvg');
+      host.innerHTML = svg;
+      const svgEl = host.querySelector('svg');
+      svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      svgEl.style.width = '100%';
+      svgEl.style.height = '100%';
+      svgEl.querySelectorAll('path').forEach(p => {
+        const pid = p.getAttribute('id');
+        if (pid === id) {
+          p.style.fill = lead.color;
+          p.style.stroke = 'var(--accent)';
+          p.style.strokeWidth = '2';
+        } else {
+          p.style.fill = 'var(--surface-2)';
+          p.style.opacity = '0.4';
+          p.style.stroke = 'var(--bg-2)';
+        }
+      });
+    });
+
+    // Animate fills
+    requestAnimationFrame(() => {
+      document.querySelectorAll('[data-w]').forEach(el => el.style.width = el.dataset.w + '%');
+    });
+
+    // Trend chart
+    setTimeout(() => {
+      const chart = document.getElementById('trendChart');
+      const W = chart.clientWidth, H = 180;
+      const pad = { l: 30, r: 10, t: 10, b: 30 };
+      const max = Math.max(...trend.map(p => p.actas));
+      const xs = (i) => pad.l + (i / (trend.length - 1)) * (W - pad.l - pad.r);
+      const ys = (v) => pad.t + (1 - v / max) * (H - pad.t - pad.b);
+
+      const line = trend.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xs(i)} ${ys(p.actas)}`).join(' ');
+      const area = line + ` L ${xs(trend.length - 1)} ${H - pad.b} L ${xs(0)} ${H - pad.b} Z`;
+
+      chart.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}">
+          <line class="axis" x1="${pad.l}" y1="${H - pad.b}" x2="${W - pad.r}" y2="${H - pad.b}"/>
+          <line class="axis" x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H - pad.b}"/>
+          <path class="area" d="${area}" fill="var(--accent)"/>
+          <path class="line" d="${line}" stroke="var(--accent)"/>
+          ${trend.map((p, i) => `<circle class="dot" cx="${xs(i)}" cy="${ys(p.actas)}" r="3"/>`).join('')}
+          ${trend.filter((_, i) => i % 2 === 0).map((p, i) => `<text class="axis-label" x="${xs(i*2)}" y="${H - 8}" text-anchor="middle">${p.hour}h</text>`).join('')}
+          <text class="axis-label" x="6" y="${pad.t + 8}">${f.n(max)}</text>
+          <text class="axis-label" x="6" y="${H - pad.b - 4}">0</text>
+        </svg>
+      `;
+    }, 100);
+
+    // GSAP entry
+    gsap.from('.dept-name', { y: 30, opacity: 0, duration: 1, ease: 'power3.out' });
+    gsap.from('.dept-summary, .dept-eyebrow', { y: 16, opacity: 0, stagger: 0.1, duration: 0.7, delay: 0.2, ease: 'power3.out' });
+    gsap.from('.dept-stat', { y: 20, opacity: 0, stagger: 0.08, duration: 0.6, delay: 0.4, ease: 'power3.out' });
+    gsap.from('.dept-card', { y: 30, opacity: 0, stagger: 0.1, duration: 0.7, delay: 0.6, ease: 'power3.out' });
+
+  })();
+  </script>
+</body>
+</html>

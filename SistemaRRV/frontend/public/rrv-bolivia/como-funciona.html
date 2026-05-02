@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cómo funciona · RRV Bolivia</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://unpkg.com/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <style>
+    .cf-hero {
+      padding: 80px 32px 60px;
+      border-bottom: 1px solid var(--border);
+      background:
+        radial-gradient(ellipse 60% 50% at 80% 30%, rgba(212, 165, 116, 0.06), transparent 70%),
+        var(--bg);
+    }
+    .cf-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .cf-hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(48px, 6vw, 92px);
+      line-height: 0.95;
+      letter-spacing: -0.025em;
+      margin-top: 14px;
+      max-width: 900px;
+    }
+    .cf-hero h1 em { font-style: italic; color: var(--accent); }
+    .cf-hero__lede {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 22px;
+      line-height: 1.4;
+      color: var(--text-muted);
+      max-width: 640px;
+      margin-top: 24px;
+    }
+
+    /* ── PIPELINE BIG VISUAL ── */
+    .cf-pipeline {
+      padding: 60px 32px;
+    }
+    .cf-step {
+      display: grid;
+      grid-template-columns: 220px 1fr 1fr;
+      gap: 40px;
+      padding: 40px 0;
+      border-bottom: 1px solid var(--border);
+      align-items: start;
+    }
+    .cf-step:last-child { border-bottom: none; }
+    .cf-step__num {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 140px;
+      line-height: 0.85;
+      color: var(--accent);
+      letter-spacing: -0.05em;
+    }
+    .cf-step__num small {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      color: var(--text-faint);
+      font-style: normal;
+      margin-bottom: 10px;
+    }
+    .cf-step__title {
+      font-family: var(--font-display);
+      font-size: 48px;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .cf-step__title em { font-style: italic; color: var(--accent); }
+    .cf-step__sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 8px;
+    }
+    .cf-step__body {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.6;
+      margin-top: 20px;
+    }
+    .cf-step__body p + p { margin-top: 12px; }
+    .cf-step__visual {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      padding: 24px;
+      min-height: 240px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Visual: phone capture ── */
+    .phone-mock {
+      width: 180px; height: 280px;
+      background: #0F1524;
+      border: 8px solid #2A2F44;
+      border-radius: 28px;
+      margin: 0 auto;
+      position: relative;
+      box-shadow: 0 30px 60px -10px rgba(0,0,0, 0.5);
+    }
+    .phone-mock::before {
+      content: ''; position: absolute;
+      top: 8px; left: 50%; transform: translateX(-50%);
+      width: 50px; height: 4px;
+      background: #2A2F44;
+      border-radius: 4px;
+    }
+    .phone-screen {
+      position: absolute; inset: 18px 6px 6px;
+      background: linear-gradient(160deg, #1A1F30, #0A0E1A);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+    .phone-screen__doc {
+      position: absolute; inset: 12px;
+      background: linear-gradient(160deg, #FAFAF7, #E8E4D8);
+      border-radius: 6px;
+      padding: 8px 10px;
+      transform: rotate(-1deg);
+      box-shadow: 0 8px 20px -4px rgba(0,0,0, 0.4);
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: rotate(-1deg) translateY(0); }
+      50% { transform: rotate(-0.4deg) translateY(-3px); }
+    }
+    .phone-screen__doc::before {
+      content: 'ACTA';
+      display: block;
+      font-family: var(--font-display);
+      font-size: 9px;
+      color: #1F1B14;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-align: center;
+      border-bottom: 1px solid #1F1B14;
+      padding-bottom: 3px;
+      margin-bottom: 4px;
+    }
+    .phone-line {
+      height: 2px;
+      background: rgba(31, 27, 20, 0.3);
+      border-radius: 2px;
+      margin-top: 3px;
+    }
+    .phone-line.short { width: 60%; }
+    .phone-line.med { width: 80%; }
+    .phone-shutter {
+      position: absolute;
+      bottom: 12px; left: 50%; transform: translateX(-50%);
+      width: 38px; height: 38px;
+      border: 3px solid var(--accent);
+      border-radius: 50%;
+      animation: shutter 2.5s ease-in-out infinite;
+    }
+    @keyframes shutter {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(212, 165, 116, 0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(212, 165, 116, 0); }
+    }
+
+    /* OCR visual */
+    .ocr-mock {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: center;
+      height: 100%;
+    }
+    .ocr-mock__doc {
+      background: #FAFAF7;
+      color: #1F1B14;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      box-shadow: 0 14px 30px -8px rgba(0,0,0, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+    .ocr-mock__doc strong { display: block; font-size: 9px; letter-spacing: 0.1em; padding-bottom: 4px; border-bottom: 1px solid #1F1B14; margin-bottom: 4px; text-align: center; }
+    .ocr-mock__doc .row { display: flex; justify-content: space-between; padding: 1px 0; position: relative; }
+    .ocr-mock__doc .scan {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent, rgba(212, 165, 116, 0.4) 50%, transparent);
+      animation: scanY 2.5s linear infinite;
+    }
+    @keyframes scanY {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+    .ocr-mock__output {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .ocr-mock__output .key { color: var(--accent); }
+    .ocr-mock__output .num { color: var(--text); font-weight: 600; }
+    .ocr-mock__output .conf { color: #16A34A; font-size: 10px; }
+
+    /* Validation visual */
+    .val-mock {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+      justify-content: center;
+    }
+    .val-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      animation: valRow 6s ease-in-out infinite;
+    }
+    .val-row:nth-child(1) { animation-delay: 0s; }
+    .val-row:nth-child(2) { animation-delay: 1.2s; }
+    .val-row:nth-child(3) { animation-delay: 2.4s; }
+    .val-row:nth-child(4) { animation-delay: 3.6s; }
+    @keyframes valRow {
+      0%, 92%, 100% { border-color: var(--border); }
+      4%, 8% { border-color: var(--accent); background: rgba(212, 165, 116, 0.06); }
+    }
+    .val-row .icon {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      display: grid; place-items: center;
+      flex-shrink: 0;
+    }
+    .val-row .label { color: var(--text-muted); flex: 1; }
+    .val-row .ok { color: #10B981; font-weight: 600; }
+
+    /* Publish visual */
+    .pub-mock {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%;
+      gap: 18px;
+    }
+    .pub-disp {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      width: 100%;
+    }
+    .pub-disp > div {
+      padding: 12px 10px;
+      background: var(--bg-2);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+    .pub-disp label { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); letter-spacing: 0.1em; text-transform: uppercase; }
+    .pub-disp .v { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.02em; margin-top: 2px; }
+
+    .pub-flow {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #10B981;
+    }
+    .pub-flow::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #10B981;
+      animation: pulse 1.4s infinite;
+    }
+
+    /* ── ARQUITECTURA ── */
+    .cf-arch {
+      margin: 80px 32px 0;
+      padding: 60px 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+    }
+    .cf-arch__head { margin-bottom: 40px; }
+    .cf-arch__head h2 {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 4.5vw, 64px);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .cf-arch__head h2 em { font-style: italic; color: var(--accent); }
+    .cf-arch-diagram {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+    .arch-node {
+      padding: 18px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      text-align: center;
+      position: relative;
+    }
+    .arch-node::after {
+      content: '→';
+      position: absolute;
+      right: -14px; top: 50%; transform: translateY(-50%);
+      color: var(--accent);
+      font-size: 14px;
+      z-index: 2;
+    }
+    .arch-node:last-child::after { display: none; }
+    .arch-node h5 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      letter-spacing: -0.01em;
+    }
+    .arch-node .tag {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 4px;
+    }
+    .arch-node .desc {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+
+    /* ── FAQ ── */
+    .cf-faq {
+      margin: 80px 32px;
+      padding: 60px 0;
+      border-top: 1px solid var(--border);
+    }
+    .cf-faq h2 {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 4.5vw, 64px);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      margin-bottom: 30px;
+    }
+    .cf-faq h2 em { font-style: italic; color: var(--accent); }
+    .faq-item {
+      padding: 22px 0;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 40px;
+      align-items: start;
+      cursor: pointer;
+    }
+    .faq-item:last-child { border-bottom: 1px solid var(--border); }
+    .faq-q {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+    }
+    .faq-q em { font-style: italic; color: var(--accent); }
+    .faq-a {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    @media (max-width: 1100px) {
+      .cf-step { grid-template-columns: 1fr; gap: 14px; }
+      .cf-step__num { font-size: 100px; }
+      .cf-arch-diagram { grid-template-columns: repeat(2, 1fr); }
+      .arch-node::after { display: none; }
+      .faq-item { grid-template-columns: 1fr; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <main class="main">
+      <div id="header-mount"></div>
+
+      <!-- HERO -->
+      <section class="cf-hero">
+        <div class="cf-hero__eyebrow">§ CÓMO FUNCIONA RRV</div>
+        <h1>De la mesa<br>al <em>dashboard.</em></h1>
+        <p class="cf-hero__lede">
+          Cuatro etapas, una promesa: que cada acta firmada en un recinto pueda llegar al ciudadano en minutos, no en horas. Sin reemplazar al cómputo oficial — complementándolo.
+        </p>
+      </section>
+
+      <!-- PIPELINE -->
+      <section class="cf-pipeline">
+
+        <div class="cf-step">
+          <div class="cf-step__num"><small>ETAPA 01</small>01</div>
+          <div>
+            <div class="cf-step__title">Captura <em>en el recinto</em></div>
+            <div class="cf-step__sub">App móvil · Operador acreditado</div>
+            <div class="cf-step__body">
+              <p>Cuando los jurados firman el acta de mesa, un operador acreditado fotografía el documento con la app oficial RRV. La foto se envía al servidor de ingesta junto con metadatos: <b>geolocalización</b>, <b>timestamp</b>, <b>identificador del recinto</b> y <b>firma digital del operador</b>.</p>
+              <p>En zonas sin conectividad de datos, la app envía un <b>mensaje SMS estructurado</b> al gateway nacional: una alternativa de baja latencia que cubre el 100% del territorio gracias a la red celular.</p>
+            </div>
+          </div>
+          <div class="cf-step__visual">
+            <div class="phone-mock">
+              <div class="phone-screen">
+                <div class="phone-screen__doc">
+                  <div class="phone-line med"></div>
+                  <div class="phone-line"></div>
+                  <div class="phone-line short"></div>
+                  <div class="phone-line med"></div>
+                  <div class="phone-line"></div>
+                  <div class="phone-line short"></div>
+                </div>
+                <div class="phone-shutter"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cf-step">
+          <div class="cf-step__num"><small>ETAPA 02</small>02</div>
+          <div>
+            <div class="cf-step__title">Lectura <em>OCR / SMS</em></div>
+            <div class="cf-step__sub">Visión computacional + parser estructurado</div>
+            <div class="cf-step__body">
+              <p>La foto entra al pipeline de <b>visión computacional</b>: detección de tabla, segmentación de celdas, extracción de números por partido. Cada celda recibe un <b>score de confianza</b>. Cuando el score baja del umbral (típico 90%), el acta se deriva a <b>revisión manual</b>.</p>
+              <p>Los SMS pasan por un <b>parser tolerante a errores</b>: protocolo estructurado simple, validación de checksum, y si falla, queda pendiente y se notifica al operador.</p>
+            </div>
+          </div>
+          <div class="cf-step__visual">
+            <div class="ocr-mock">
+              <div class="ocr-mock__doc">
+                <strong>ACTA</strong>
+                <div class="row"><span>P1</span><span>87</span></div>
+                <div class="row"><span>P2</span><span>62</span></div>
+                <div class="row"><span>P3</span><span>54</span></div>
+                <div class="row"><span>P4</span><span>38</span></div>
+                <div class="row"><span>BL</span><span>3</span></div>
+                <div class="row"><span>NL</span><span>2</span></div>
+                <div class="scan"></div>
+              </div>
+              <div class="ocr-mock__output">
+                <div><span class="key">P1:</span> <span class="num">87</span> <span class="conf">98.4%</span></div>
+                <div><span class="key">P2:</span> <span class="num">62</span> <span class="conf">97.1%</span></div>
+                <div><span class="key">P3:</span> <span class="num">54</span> <span class="conf">96.8%</span></div>
+                <div><span class="key">P4:</span> <span class="num">38</span> <span class="conf">94.3%</span></div>
+                <div style="margin-top:8px; padding-top:6px; border-top: 1px dashed var(--border);"><span class="key">total:</span> <span class="num">246</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cf-step">
+          <div class="cf-step__num"><small>ETAPA 03</small>03</div>
+          <div>
+            <div class="cf-step__title">Validación <em>e idempotencia</em></div>
+            <div class="cf-step__sub">Estructura · Duplicados · Coherencia</div>
+            <div class="cf-step__body">
+              <p>Cada acta se valida contra cuatro reglas: <b>estructura</b> (todos los campos presentes), <b>totales coherentes</b> (votos válidos + nulos + blancos = padrón habilitado), <b>idempotencia</b> (mismo identificador único, no se cuenta dos veces), y <b>verificación cruzada</b> (foto vs. SMS cuando ambos llegan).</p>
+              <p>Las actas duplicadas se marcan y se descartan del cómputo. Las que generan conflicto se elevan a un panel humano de auditoría en tiempo real.</p>
+            </div>
+          </div>
+          <div class="cf-step__visual">
+            <div class="val-mock">
+              <div class="val-row">
+                <span class="icon">✓</span>
+                <span class="label">Estructura del acta</span>
+                <span class="ok">OK</span>
+              </div>
+              <div class="val-row">
+                <span class="icon">✓</span>
+                <span class="label">Totales coherentes</span>
+                <span class="ok">OK</span>
+              </div>
+              <div class="val-row">
+                <span class="icon">✓</span>
+                <span class="label">Idempotencia</span>
+                <span class="ok">OK</span>
+              </div>
+              <div class="val-row">
+                <span class="icon">✓</span>
+                <span class="label">Cross-check OCR ↔ SMS</span>
+                <span class="ok">OK</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cf-step">
+          <div class="cf-step__num"><small>ETAPA 04</small>04</div>
+          <div>
+            <div class="cf-step__title">Publicación <em>preliminar</em></div>
+            <div class="cf-step__sub">Dashboard · CQRS · Replicación</div>
+            <div class="cf-step__body">
+              <p>El acta validada se proyecta hacia las <b>vistas de lectura</b>: dashboard nacional, mapa por departamento, ranking, tabla de actas. La arquitectura usa <b>CQRS</b> y <b>event sourcing</b> — el stream de eventos puede reconstruir cualquier vista, en cualquier momento.</p>
+              <p>El cluster es <b>activo-activo</b> con replicación síncrona y failover automático. El objetivo de disponibilidad es 99.95% durante la jornada electoral.</p>
+            </div>
+          </div>
+          <div class="cf-step__visual">
+            <div class="pub-mock">
+              <div class="pub-disp">
+                <div><label>P1</label><div class="v" style="color:#3B82F6">38.2</div></div>
+                <div><label>P2</label><div class="v" style="color:#EA580C">31.4</div></div>
+                <div><label>P3</label><div class="v" style="color:#8B5CF6">21.7</div></div>
+              </div>
+              <div class="pub-flow">PUBLICADO · 3.8s desde captura</div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ARQUITECTURA -->
+      <section class="cf-arch">
+        <div class="cf-arch__head">
+          <div class="eyebrow">§ ARQUITECTURA</div>
+          <h2 style="margin-top: 12px;">Pensada para <em>fallar bien.</em></h2>
+        </div>
+        <div class="cf-arch-diagram">
+          <div class="arch-node">
+            <h5>Recinto</h5>
+            <div class="tag">EDGE</div>
+            <div class="desc">App móvil · SMS gateway · Operador acreditado</div>
+          </div>
+          <div class="arch-node">
+            <h5>Ingesta</h5>
+            <div class="tag">API GATEWAY</div>
+            <div class="desc">TLS · Rate-limit · Firma · Anti-replay</div>
+          </div>
+          <div class="arch-node">
+            <h5>Procesamiento</h5>
+            <div class="tag">WORKERS</div>
+            <div class="desc">OCR · Parser · Validador · Cola distribuida</div>
+          </div>
+          <div class="arch-node">
+            <h5>Event Store</h5>
+            <div class="tag">SOURCING</div>
+            <div class="desc">Append-only · Idempotente · Replicado</div>
+          </div>
+          <div class="arch-node">
+            <h5>Vistas</h5>
+            <div class="tag">CQRS · CDN</div>
+            <div class="desc">Dashboard · Mapa · API pública</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 30px;">
+          <div style="padding: 22px; background: var(--bg-2); border-radius: 14px; border: 1px solid var(--border);">
+            <div class="eyebrow">RESILIENCIA</div>
+            <div style="font-family: var(--font-display); font-size: 26px; letter-spacing: -0.01em; margin-top: 8px;">Dual-active</div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px; line-height: 1.5;">Dos data centers en regiones distintas. Replicación síncrona del event store. Failover en menos de 30 segundos.</p>
+          </div>
+          <div style="padding: 22px; background: var(--bg-2); border-radius: 14px; border: 1px solid var(--border);">
+            <div class="eyebrow">SEGURIDAD</div>
+            <div style="font-family: var(--font-display); font-size: 26px; letter-spacing: -0.01em; margin-top: 8px;">Defensa <em style="font-style:italic; color:var(--accent)">en capas</em></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px; line-height: 1.5;">WAF · TLS mutuo · Firma del operador · Hash del acta · Anti-replay en cada paso.</p>
+          </div>
+          <div style="padding: 22px; background: var(--bg-2); border-radius: 14px; border: 1px solid var(--border);">
+            <div class="eyebrow">ESCALA</div>
+            <div style="font-family: var(--font-display); font-size: 26px; letter-spacing: -0.01em; margin-top: 8px;">35.000 mesas</div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px; line-height: 1.5;">Pico esperado de 800 actas/minuto. Cluster auto-escalable. Cola de procesamiento a prueba de avalanchas.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="cf-faq">
+        <h2>Preguntas <em>frecuentes</em></h2>
+        <div class="faq-item">
+          <div class="faq-q">¿Esto reemplaza al <em>cómputo oficial?</em></div>
+          <div class="faq-a">No. El RRV es un sistema preliminar y NO oficial cuyo único propósito es entregar resultados tempranos al ciudadano. El cómputo oficial — exhaustivo, auditado y vinculante — corre por separado y bajo procedimientos legales distintos.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">¿Y si llegan resultados <em>contradictorios?</em></div>
+          <div class="faq-a">El sistema detecta inconsistencias entre foto y SMS, o entre actualizaciones de la misma mesa. En ese caso el acta se eleva a revisión manual y no se publica hasta que un humano la valida. Toda la trazabilidad queda registrada.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">¿Qué pasa si <em>cae el sistema?</em></div>
+          <div class="faq-a">El cluster es activo-activo: dos centros de datos en regiones distintas atienden tráfico simultáneamente. Si uno cae, el otro absorbe la carga. La cola de procesamiento es persistente — los eventos se reintentan hasta confirmar.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">¿Quién audita <em>el código?</em></div>
+          <div class="faq-a">El código fuente, los modelos de OCR y los volcados periódicos del event store son auditables por observadores acreditados. Los detalles están en la <a href="transparencia.html" style="color:var(--accent); text-decoration:underline;">página de transparencia</a>.</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/shell.js"></script>
+  <script>
+    document.getElementById('header-mount').innerHTML = RRVShell.renderHeader({
+      title: '<em>Cómo</em> funciona',
+      sub: 'Pipeline OCR/SMS y arquitectura del sistema',
+      badges: false,
+    });
+    RRVShell.initShell('como-funciona.html');
+
+    if (window.gsap && window.ScrollTrigger) {
+      gsap.registerPlugin(ScrollTrigger);
+      gsap.from('.cf-hero h1, .cf-hero__lede, .cf-hero__eyebrow', {
+        y: 30, opacity: 0, stagger: 0.15, duration: 0.9, ease: 'power3.out',
+      });
+      gsap.utils.toArray('.cf-step').forEach(step => {
+        gsap.from(step.children, {
+          y: 30, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power3.out',
+          scrollTrigger: { trigger: step, start: 'top 80%' },
+        });
+      });
+      gsap.from('.arch-node', {
+        y: 20, opacity: 0, stagger: 0.08, duration: 0.6, ease: 'power3.out',
+        scrollTrigger: { trigger: '.cf-arch-diagram', start: 'top 80%' },
+      });
+      gsap.from('.faq-item', {
+        y: 20, opacity: 0, stagger: 0.08, duration: 0.6, ease: 'power3.out',
+        scrollTrigger: { trigger: '.cf-faq', start: 'top 80%' },
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+﻿import { useRef, useState } from 'react'
 import { departments, partyById, fmt } from '../data/rrv'
 
 const DEPT_PATHS = {
@@ -43,7 +43,7 @@ export default function MapBlock({
       return `rgba(16, 185, 129, ${intensity.toFixed(2)})`
     }
     if (mode === 'actas') {
-      const progress = dept.actas / dept.mesas
+      const progress = dept.mesas > 0 ? dept.actas / dept.mesas : 0
       const intensity = Math.max(0.28, Math.min(1, progress))
       return `rgba(212, 165, 116, ${intensity.toFixed(2)})`
     }
@@ -53,7 +53,7 @@ export default function MapBlock({
   const getDeptValue = (dept) => {
     if (partyFilter !== 'all') return dept.pct[partyFilter]
     if (mode === 'participacion') return dept.participacion
-    if (mode === 'actas') return (dept.actas / dept.mesas) * 100
+    if (mode === 'actas') return dept.mesas > 0 ? (dept.actas / dept.mesas) * 100 : 0
     return dept.pct[dept.leader]
   }
 
@@ -72,7 +72,7 @@ export default function MapBlock({
             <div className="map-tt show" style={{ left: tooltip.x, top: tooltip.y }}>
               <h5><em>{d.name}</em></h5>
               <div className="tt-row">
-                <span>LÍDER</span>
+                <span>LÃDER</span>
                 <span style={{ color: lead.color }}>{lead.name} {d.pct[d.leader].toFixed(1)}%</span>
               </div>
               <div className="tt-row"><span>VOTOS</span><span>{fmt.n(d.votos)}</span></div>
@@ -123,3 +123,4 @@ export default function MapBlock({
     </div>
   )
 }
+

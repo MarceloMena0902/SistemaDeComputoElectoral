@@ -1,0 +1,2692 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RRV Bolivia â€” Recuento RÃ¡pido de Votos</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://unpkg.com/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <style>
+    body { overflow-x: hidden; }
+    body[data-theme="dark"] { background: #07091a; }
+
+    .ambient-particles {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.58;
+      mix-blend-mode: screen;
+    }
+
+    .hero,
+    .pipeline-section,
+    .stats-band,
+    .pull-quote-section,
+    .features-section,
+    .cta-final,
+    footer {
+      position: relative;
+    }
+
+    /* â”€â”€â”€ TOP NAV â”€â”€â”€ */
+    .topnav {
+      position: fixed; inset: 0 0 auto 0; z-index: 50;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 22px 40px;
+      backdrop-filter: blur(14px);
+      background: rgba(7, 9, 26, 0.6);
+      border-bottom: 1px solid var(--border);
+    }
+    [data-theme="light"] .topnav { background: rgba(250, 250, 247, 0.7); }
+    .topnav__brand { display: flex; align-items: center; gap: 10px; }
+    .topnav__brand .brand-mark { width: 32px; height: 32px; font-size: 19px; border-radius: 8px; }
+    .topnav__brand strong { font-family: var(--font-display); font-size: 18px; letter-spacing: -0.01em; }
+    .topnav__menu { display: flex; gap: 28px; align-items: center; }
+    .topnav__menu a { font-size: 13px; color: var(--text-muted); transition: color 0.15s; }
+    .topnav__menu a:hover { color: var(--text); }
+    .topnav__cta { display: flex; gap: 10px; align-items: center; }
+
+    /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+    /*           HERO â€” IMMERSIVE 3D GLOBE       */
+    /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+    .hero {
+      position: relative;
+      height: 100vh;
+      min-height: 720px;
+      overflow: hidden;
+    }
+    /* Full-bleed canvas */
+    #worldCanvas {
+      position: absolute; inset: 0;
+      z-index: 0;
+    }
+    /* Atmospheric overlays */
+    .hero__sky {
+      position: absolute; inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 50%, transparent 30%, rgba(7, 9, 26, 0.6) 80%, rgba(7, 9, 26, 1) 100%),
+        radial-gradient(ellipse 50% 40% at 30% 30%, rgba(212, 165, 116, 0.06), transparent 60%);
+    }
+    .hero__grain {
+      position: absolute; inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0.08;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    }
+
+    .bolivia-map-anchor {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      top: 50%;
+      width: clamp(116px, 13vw, 184px);
+      aspect-ratio: 0.88;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+      filter:
+        drop-shadow(0 0 8px rgba(255, 226, 184, 0.85))
+        drop-shadow(0 0 22px rgba(212, 165, 116, 0.55));
+    }
+    .bolivia-map-anchor.is-ready {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .bolivia-map-anchor::before,
+    .bolivia-map-anchor::after {
+      content: '';
+      position: absolute;
+      inset: -18%;
+      border: 1px solid rgba(212, 165, 116, 0.32);
+      border-radius: 50%;
+      transform: rotate(-12deg);
+    }
+    .bolivia-map-anchor::after {
+      inset: -30%;
+      opacity: 0.38;
+      border-color: rgba(255, 226, 184, 0.22);
+    }
+    .bolivia-map-anchor img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      opacity: 0.96;
+      filter: brightness(0) saturate(100%) invert(84%) sepia(29%) saturate(536%) hue-rotate(350deg) brightness(99%) contrast(95%);
+    }
+
+    /* HERO TEXT (top-left) */
+    .hero__head {
+      position: absolute;
+      z-index: 5;
+      top: 130px; left: 60px;
+      max-width: 720px;
+      pointer-events: none;
+    }
+    .hero__head > * { pointer-events: auto; }
+    .hero__eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--accent);
+      padding: 7px 14px;
+      border: 1px solid rgba(212, 165, 116, 0.3);
+      border-radius: 999px;
+      background: rgba(212, 165, 116, 0.06);
+      backdrop-filter: blur(8px);
+    }
+    .hero__eyebrow::before {
+      content: ''; width: 6px; height: 6px;
+      background: var(--accent); border-radius: 50%;
+      animation: pulse 1.8s infinite;
+    }
+    .hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(56px, 7.6vw, 132px);
+      line-height: 0.92;
+      letter-spacing: -0.028em;
+      margin-top: 22px;
+      font-weight: 400;
+      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+    }
+    .hero__title em { font-style: italic; color: var(--accent); }
+    .hero__lede {
+      font-family: var(--font-display);
+      font-size: clamp(18px, 1.6vw, 24px);
+      font-style: italic;
+      line-height: 1.4;
+      color: var(--text-muted);
+      max-width: 540px;
+      margin-top: 26px;
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+    }
+
+    /* HERO LIVE COUNTER (top-right) */
+    .hero__live {
+      position: absolute;
+      z-index: 5;
+      top: 130px; right: 60px;
+      width: 280px;
+      padding: 22px 24px;
+      background: rgba(15, 19, 36, 0.72);
+      backdrop-filter: blur(20px) saturate(1.4);
+      border: 1px solid rgba(212, 165, 116, 0.28);
+      border-radius: 18px;
+      box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.4);
+    }
+    .hero__live-label {
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--accent);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hero__live-label::before {
+      content: ''; width: 7px; height: 7px;
+      border-radius: 50%; background: #16A34A;
+      animation: pulse 1.4s infinite;
+    }
+    .hero__live-num {
+      font-family: var(--font-display);
+      font-size: 56px;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      margin-top: 10px;
+      font-variant-numeric: tabular-nums;
+      color: #FFFFFF;
+    }
+    .hero__live-foot {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex; justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.55);
+    }
+
+    /* HERO CTA (bottom-left) */
+    .hero__cta-wrap {
+      position: absolute;
+      z-index: 5;
+      bottom: 40px; left: 60px;
+      display: flex; gap: 12px;
+    }
+    .hero__cta-wrap .btn { padding: 14px 24px; font-size: 14px; }
+
+    /* HERO STRIP (bottom, full width) */
+    .hero__strip {
+      position: absolute;
+      z-index: 5;
+      bottom: 40px; right: 60px;
+      display: flex; gap: 36px;
+      padding: 14px 22px;
+      background: rgba(15, 19, 36, 0.6);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+    }
+    .hero__strip > div { display: flex; flex-direction: column; gap: 2px; }
+    .hero__strip label {
+      font-family: var(--font-mono);
+      font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.5);
+    }
+    .hero__strip strong {
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
+      color: #FFFFFF;
+    }
+
+    /* â”€â”€â”€ ACTA POPUPS (floating in viewport) â”€â”€â”€ */
+    .acta-popups {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    /* COMPACT acta popups, anchored to Bolivia on the globe */
+    .acta-pop {
+      position: absolute;
+      min-width: 108px;
+      max-width: 126px;
+      padding: 5px 7px 6px;
+      background: rgba(15, 19, 36, 0.92);
+      backdrop-filter: blur(12px) saturate(1.35);
+      border: 1px solid rgba(212, 165, 116, 0.45);
+      border-radius: 7px;
+      box-shadow:
+        0 10px 22px -10px rgba(0, 0, 0, 0.6),
+        0 0 0 0.5px rgba(255, 255, 255, 0.06) inset,
+        0 0 18px -7px rgba(212, 165, 116, 0.35);
+      opacity: 0;
+      transform: translateY(8px) scale(0.92);
+      pointer-events: auto;
+      cursor: default;
+      transform-origin: bottom left;
+    }
+    .acta-pop.show {
+      animation: actaPop 6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes actaPop {
+      0%   { opacity: 0; transform: translateY(8px) scale(0.95); }
+      10%  { opacity: 1; transform: translateY(0) scale(1); }
+      82%  { opacity: 1; transform: translateY(-3px) scale(1); }
+      100% { opacity: 0; transform: translateY(-14px) scale(0.97); }
+    }
+    .acta-pop__leader {
+      position: absolute;
+      bottom: -1px; left: 10px;
+      width: 1px;
+      background: linear-gradient(to bottom, var(--accent), transparent);
+      pointer-events: none;
+    }
+    .acta-pop__leader::after {
+      content: '';
+      position: absolute;
+      bottom: -3px; left: -3px;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent), 0 0 20px rgba(212, 165, 116, 0.5);
+    }
+    .acta-pop__row1 {
+      display: flex; align-items: center; gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 6.8px;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .acta-pop__row1::before {
+      content: ''; width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1.4s infinite;
+      flex: none;
+    }
+    .acta-pop__title {
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: -0.01em;
+      color: #FFFFFF;
+      line-height: 1.2;
+      margin-top: 3px;
+    }
+    .acta-pop__city {
+      font-family: var(--font-mono);
+      font-size: 7px;
+      color: rgba(255, 255, 255, 0.55);
+      letter-spacing: 0.08em;
+      margin-top: 1px;
+      text-transform: uppercase;
+    }
+
+    /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+    /*       SECTION 02 â€” PIPELINE / ÃNFORA      */
+    /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+    .pipeline-section {
+      position: relative;
+      padding: 120px 40px;
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 520px;
+      gap: 60px;
+      align-items: center;
+    }
+    .pipeline-text .eyebrow { color: var(--accent); }
+    .pipeline-text h2 {
+      font-family: var(--font-display);
+      font-size: clamp(40px, 5vw, 80px);
+      letter-spacing: -0.025em;
+      line-height: 0.95;
+      margin-top: 14px;
+    }
+    .pipeline-text h2 em { font-style: italic; color: var(--accent); }
+    .pipeline-text p {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 22px;
+      line-height: 1.45;
+      color: var(--text-muted);
+      max-width: 540px;
+      margin-top: 24px;
+    }
+    .pipeline-text ol {
+      list-style: none;
+      padding: 0;
+      margin-top: 36px;
+      counter-reset: step;
+    }
+    .pipeline-text ol li {
+      padding: 18px 0;
+      border-top: 1px solid var(--border);
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 16px;
+      align-items: baseline;
+    }
+    .pipeline-text ol li:last-child { border-bottom: 1px solid var(--border); }
+    .pipeline-text ol li::before {
+      content: "0" counter(step);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+    }
+    .pipeline-text ol li b {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .pipeline-text ol li b em { font-style: italic; color: var(--accent); }
+    .pipeline-text ol li span {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* â”€â”€â”€ ÃNFORA / BALLOT BOX 3D â”€â”€â”€ */
+    .anfora-stage {
+      position: relative;
+      height: 540px;
+      perspective: 1400px;
+      transform-style: preserve-3d;
+      isolation: isolate;
+    }
+    .anfora-stage::before {
+      content: '';
+      position: absolute;
+      inset: 28px 12px 34px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(212, 165, 116, 0.16), transparent 19%),
+        conic-gradient(from 210deg at 50% 52%, transparent 0 18deg, rgba(212, 165, 116, 0.18) 22deg 26deg, transparent 31deg 110deg, rgba(94, 166, 255, 0.14) 118deg 123deg, transparent 132deg 360deg);
+      filter: blur(0.2px);
+      opacity: 0.75;
+      transform: rotateX(62deg) rotateZ(-10deg);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .anfora-stage.is-ingesting::before {
+      animation: intakeOrbit 0.95s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .anfora-scene {
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+      transform: rotateX(20deg);
+      z-index: 2;
+    }
+
+    /* Ground reflection */
+    .anfora-ground {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      width: 460px; height: 260px;
+      transform: translateX(-50%) rotateX(74deg) rotateZ(-8deg);
+      background:
+        radial-gradient(ellipse 62% 42% at 50% 50%, rgba(212, 165, 116, 0.2), transparent 68%),
+        radial-gradient(ellipse 42% 28% at 60% 52%, rgba(94, 166, 255, 0.12), transparent 70%);
+      filter: blur(14px);
+    }
+
+    .anfora-beam {
+      position: absolute;
+      left: 50%;
+      top: 24px;
+      width: 132px;
+      height: 260px;
+      transform: translateX(-50%) rotateX(-10deg);
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.55;
+      background:
+        linear-gradient(90deg, transparent, rgba(212, 165, 116, 0.16), transparent),
+        linear-gradient(180deg, rgba(255, 226, 184, 0), rgba(255, 226, 184, 0.16) 52%, rgba(212, 165, 116, 0));
+      clip-path: polygon(36% 0, 64% 0, 100% 100%, 0 100%);
+      filter: blur(1px);
+    }
+    .anfora-beam::before,
+    .anfora-beam::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent, rgba(255, 226, 184, 0.32), transparent);
+      transform: translateY(-100%);
+      animation: beamScan 2.3s linear infinite;
+    }
+    .anfora-beam::after {
+      animation-delay: 1.15s;
+      opacity: 0.5;
+    }
+
+    .anfora-field {
+      position: absolute;
+      left: 50%;
+      top: 78px;
+      width: 240px;
+      height: 190px;
+      transform: translateX(-50%);
+      border: 1px solid rgba(212, 165, 116, 0.16);
+      border-radius: 14px;
+      pointer-events: none;
+      z-index: 3;
+      opacity: 0.78;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(212, 165, 116, 0.12) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(94, 166, 255, 0.08) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: radial-gradient(ellipse 80% 72% at 50% 56%, #000 42%, transparent 84%);
+    }
+    .anfora-field::before {
+      content: '';
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      top: 30px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 226, 184, 0.86), transparent);
+      box-shadow: 0 0 22px rgba(212, 165, 116, 0.68);
+      opacity: 0;
+      transform: translateY(0);
+    }
+    .anfora-stage.is-scanning .anfora-field::before {
+      animation: scanSweep 0.82s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .anfora-status {
+      position: absolute;
+      left: 50%;
+      top: 122px;
+      transform: translateX(-50%);
+      z-index: 8;
+      min-width: 148px;
+      padding: 8px 10px;
+      border: 1px solid rgba(212, 165, 116, 0.32);
+      border-radius: 8px;
+      background: rgba(7, 9, 26, 0.66);
+      backdrop-filter: blur(12px);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      line-height: 1.35;
+      letter-spacing: 0.14em;
+      color: rgba(255, 226, 184, 0.84);
+      text-transform: uppercase;
+      pointer-events: none;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+    .anfora-status span {
+      display: block;
+      color: rgba(255, 255, 255, 0.48);
+      letter-spacing: 0.08em;
+      margin-top: 2px;
+    }
+
+    .anfora-orbit {
+      position: absolute;
+      left: 50%;
+      top: 292px;
+      width: 330px;
+      height: 118px;
+      border: 1px solid rgba(212, 165, 116, 0.22);
+      border-radius: 50%;
+      transform: translate(-50%, -50%) rotateX(64deg) rotateZ(-8deg);
+      pointer-events: none;
+      z-index: 4;
+    }
+    .anfora-orbit::before,
+    .anfora-orbit::after {
+      content: '';
+      position: absolute;
+      inset: 14px 32px;
+      border: 1px solid rgba(94, 166, 255, 0.16);
+      border-radius: 50%;
+    }
+    .anfora-orbit::after {
+      inset: -18px -38px;
+      border-color: rgba(212, 165, 116, 0.12);
+    }
+    .anfora-stage.is-ingesting .anfora-orbit {
+      border-color: rgba(255, 226, 184, 0.5);
+      box-shadow: 0 0 34px rgba(212, 165, 116, 0.2);
+    }
+
+    /* The ballot box */
+    .anfora {
+      position: absolute;
+      bottom: 78px; left: 50%;
+      width: 306px; height: 218px;
+      transform: translateX(-50%) rotateY(-18deg) rotateX(5deg) rotateZ(-1deg);
+      transform-style: preserve-3d;
+      transform-origin: 50% 70%;
+      will-change: transform;
+    }
+    .anfora::before,
+    .anfora::after {
+      content: '';
+      position: absolute;
+      pointer-events: none;
+      border: 1px solid rgba(212, 165, 116, 0.24);
+      box-shadow: inset 0 0 34px rgba(212, 165, 116, 0.08);
+    }
+    .anfora::before {
+      left: 28px;
+      right: -44px;
+      top: -54px;
+      height: 76px;
+      transform: skewX(-30deg);
+      transform-origin: left bottom;
+      border-radius: 10px 12px 4px 4px;
+      background:
+        linear-gradient(150deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03) 35%, rgba(212, 165, 116, 0.12)),
+        linear-gradient(180deg, rgba(20, 27, 45, 0.82), rgba(8, 12, 24, 0.78));
+      backdrop-filter: blur(5px);
+      z-index: 3;
+    }
+    .anfora::after {
+      right: -68px;
+      top: -20px;
+      width: 74px;
+      height: 222px;
+      transform: skewY(-31deg);
+      transform-origin: left top;
+      border-radius: 2px 12px 12px 4px;
+      background:
+        linear-gradient(110deg, rgba(255, 255, 255, 0.08), rgba(94, 166, 255, 0.07) 38%, rgba(9, 13, 25, 0.74)),
+        linear-gradient(180deg, rgba(18, 24, 40, 0.76), rgba(7, 10, 20, 0.9));
+      z-index: 2;
+    }
+    .anfora__face {
+      position: absolute;
+      background: linear-gradient(160deg, #1A2132, #0E1424);
+      border: 1px solid rgba(212, 165, 116, 0.18);
+    }
+    .anfora__face {
+      position: absolute;
+      background: linear-gradient(160deg, #1A2132, #0E1424);
+      border: 1px solid rgba(212, 165, 116, 0.18);
+    }
+    /* Front (transparent crystal) */
+    .anfora__front {
+      width: 306px; height: 218px;
+      background:
+        linear-gradient(122deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.025) 28%, transparent 45%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025) 58%, rgba(212, 165, 116, 0.1)),
+        linear-gradient(135deg, rgba(15, 19, 36, 0.76), rgba(8, 12, 25, 0.54));
+      backdrop-filter: blur(4px) saturate(1.25);
+      border: 1px solid rgba(255, 226, 184, 0.42);
+      border-radius: 10px;
+      box-shadow:
+        inset 0 0 78px rgba(212, 165, 116, 0.13),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+        22px 34px 70px -32px rgba(0, 0, 0, 0.8),
+        0 0 80px -20px rgba(212, 165, 116, 0.25);
+      overflow: hidden;
+      transform: translateZ(54px);
+      z-index: 4;
+    }
+    .anfora__front::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(112deg, transparent 0 30%, rgba(255, 255, 255, 0.12) 31%, transparent 36%),
+        linear-gradient(90deg, transparent, rgba(212, 165, 116, 0.5), transparent);
+      opacity: 0.42;
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+    .anfora__front::after {
+      content: '';
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 226, 184, 0.5), transparent);
+      box-shadow: 0 -52px 42px rgba(212, 165, 116, 0.12);
+      pointer-events: none;
+    }
+    /* Slot label engraved */
+    .anfora__label {
+      position: absolute;
+      top: 20px; left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.32em;
+      color: rgba(212, 165, 116, 0.7);
+      pointer-events: none;
+      z-index: 9;
+    }
+    /* Slot opening (top) */
+    .anfora__slot {
+      position: absolute;
+      top: 44px; left: 50%;
+      transform: translateX(-50%);
+      width: 150px; height: 9px;
+      background: #050811;
+      border-radius: 999px;
+      box-shadow:
+        inset 0 2px 6px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(212, 165, 116, 0.35),
+        0 -2px 14px rgba(212, 165, 116, 0.4);
+      z-index: 5;
+      transform-style: preserve-3d;
+    }
+    .anfora__slot::after {
+      content: '';
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      height: 1px;
+      transform: translateY(-50%);
+      background: linear-gradient(90deg, transparent, rgba(255, 226, 184, 0.85), transparent);
+      opacity: 0.55;
+    }
+    /* Inside scribbles â€” stacked actas at bottom */
+    .anfora__pile {
+      position: absolute;
+      bottom: 26px; left: 38px; right: 26px;
+      height: 82px;
+      z-index: 2;
+      transform: rotateZ(1deg) skewX(-8deg);
+      transform-origin: center bottom;
+    }
+    .pile-acta {
+      position: absolute;
+      width: 58px; height: 78px;
+      background:
+        linear-gradient(120deg, rgba(255,255,255,0.55), transparent 32%),
+        linear-gradient(160deg, #FAFAF7, #E8E4D8);
+      border-radius: 3px;
+      box-shadow:
+        10px 14px 18px -12px rgba(0, 0, 0, 0.75),
+        inset 0 0 0 1px rgba(31, 27, 20, 0.12);
+      transform-origin: center bottom;
+    }
+    .pile-acta::before, .pile-acta::after {
+      content: '';
+      position: absolute;
+      left: 8px; right: 8px;
+      height: 1px;
+      background: rgba(31, 27, 20, 0.25);
+    }
+    .pile-acta::before { top: 14px; }
+    .pile-acta::after { top: 22px; box-shadow: 0 4px 0 rgba(31, 27, 20, 0.2), 0 8px 0 rgba(31, 27, 20, 0.18), 0 12px 0 rgba(31, 27, 20, 0.15); }
+    /* Glow inside */
+    .anfora__glow {
+      position: absolute;
+      bottom: 8px; left: 50%;
+      transform: translateX(-50%);
+      width: 78%; height: 76px;
+      background:
+        radial-gradient(ellipse 90% 80% at 50% 88%, rgba(212, 165, 116, 0.36), transparent 68%),
+        radial-gradient(ellipse 42% 34% at 58% 52%, rgba(94, 166, 255, 0.12), transparent 72%);
+      filter: blur(10px);
+      z-index: 1;
+    }
+
+    /* Falling acta â€” better paper-like rendering */
+    .falling-acta {
+      position: absolute;
+      width: 84px; height: 108px;
+      left: calc(50% - 42px);
+      background:
+        linear-gradient(90deg, transparent 0 13%, rgba(151, 112, 54, 0.13) 13.5% 14.5%, transparent 15%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.4), transparent 30%),
+        linear-gradient(160deg, #FAFAF7 0%, #F0EBDC 100%);
+      border-radius: 2px;
+      box-shadow:
+        0 18px 30px -8px rgba(0, 0, 0, 0.45),
+        0 4px 8px -2px rgba(0, 0, 0, 0.25),
+        inset 0 0 0 0.5px rgba(31, 27, 20, 0.15);
+      pointer-events: none;
+      will-change: transform, opacity;
+      padding: 8px 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 6px;
+      color: #1F1B14;
+      z-index: 7;
+      transform-style: preserve-3d;
+      transform-origin: 50% 70%;
+      overflow: hidden;
+      backface-visibility: hidden;
+    }
+    .falling-acta::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(115deg, transparent 0 42%, rgba(212, 165, 116, 0.22) 43%, transparent 47%),
+        radial-gradient(circle at 76% 22%, rgba(212, 165, 116, 0.22), transparent 18%);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+    .falling-acta::before {
+      content: 'ACTA Â· RRV';
+      display: block;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-align: center;
+      font-size: 6.5px;
+      border-bottom: 1px solid rgba(31, 27, 20, 0.6);
+      padding-bottom: 3px;
+      margin-bottom: 4px;
+      color: #5A4321;
+    }
+    .falling-acta .row {
+      display: flex; justify-content: space-between;
+      padding: 1.5px 0;
+      border-bottom: 0.5px dotted rgba(31, 27, 20, 0.18);
+    }
+    .falling-acta .seal {
+      position: absolute;
+      bottom: 6px; right: 6px;
+      width: 14px; height: 14px;
+      border: 1px solid #D97706;
+      border-radius: 50%;
+      font-size: 5px;
+      color: #D97706;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+    }
+
+    .acta-trail {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 226, 184, 0.82);
+      box-shadow: 0 0 14px rgba(212, 165, 116, 0.75);
+      pointer-events: none;
+      z-index: 6;
+      will-change: transform, opacity;
+    }
+
+    /* Slot opens with a brief flash when acta enters */
+    .anfora__slot {
+      transition: box-shadow 0.2s, height 0.18s;
+    }
+    .anfora__slot.flash {
+      box-shadow:
+        inset 0 2px 6px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(212, 165, 116, 0.7),
+        0 -2px 30px rgba(212, 165, 116, 0.9),
+        0 0 50px rgba(212, 165, 116, 0.5);
+    }
+
+    .anfora-stage.is-ingesting .anfora__slot {
+      height: 11px;
+      box-shadow:
+        inset 0 2px 6px rgba(0, 0, 0, 0.92),
+        0 0 0 1px rgba(255, 226, 184, 0.75),
+        0 -5px 38px rgba(212, 165, 116, 0.78),
+        0 0 72px rgba(94, 166, 255, 0.25);
+    }
+
+    /* Rebuilt ballot box: explicit isometric faces instead of warped panels */
+    .anfora {
+      bottom: 78px;
+      width: 378px;
+      height: 276px;
+      transform: translateX(-50%);
+      transform-style: flat;
+    }
+    .anfora::before,
+    .anfora::after {
+      display: none;
+    }
+    .anfora__base,
+    .anfora__top,
+    .anfora__side,
+    .anfora__front {
+      position: absolute;
+      pointer-events: none;
+    }
+    .anfora__base {
+      left: 22px;
+      top: 226px;
+      width: 300px;
+      height: 42px;
+      clip-path: polygon(8% 0, 100% 0, 88% 100%, 0 100%);
+      background:
+        linear-gradient(180deg, rgba(212, 165, 116, 0.18), rgba(7, 10, 20, 0.8)),
+        linear-gradient(100deg, rgba(255, 255, 255, 0.08), transparent 42%);
+      border: 1px solid rgba(212, 165, 116, 0.28);
+      box-shadow: 0 28px 50px -28px rgba(0, 0, 0, 0.9);
+      z-index: 1;
+    }
+    .anfora__side {
+      left: 292px;
+      top: 76px;
+      width: 78px;
+      height: 190px;
+      clip-path: polygon(0 0, 100% 16%, 86% 88%, 0 100%);
+      background:
+        linear-gradient(110deg, rgba(255, 255, 255, 0.08), rgba(94, 166, 255, 0.08) 34%, rgba(7, 10, 20, 0.86)),
+        linear-gradient(180deg, rgba(19, 26, 42, 0.78), rgba(4, 7, 16, 0.92));
+      border: 1px solid rgba(212, 165, 116, 0.24);
+      box-shadow:
+        inset 18px 0 34px rgba(255, 255, 255, 0.03),
+        inset -20px 0 34px rgba(0, 0, 0, 0.38);
+      z-index: 2;
+    }
+    .anfora__top {
+      left: 36px;
+      top: 34px;
+      width: 302px;
+      height: 86px;
+      clip-path: polygon(16% 100%, 0 38%, 78% 0, 100% 56%);
+      background:
+        linear-gradient(140deg, rgba(255, 255, 255, 0.18), transparent 30%),
+        linear-gradient(172deg, rgba(34, 42, 62, 0.9), rgba(10, 14, 28, 0.88) 72%, rgba(212, 165, 116, 0.16));
+      border: 1px solid rgba(255, 226, 184, 0.36);
+      box-shadow:
+        inset 0 0 34px rgba(255, 226, 184, 0.08),
+        0 14px 36px -22px rgba(212, 165, 116, 0.5);
+      z-index: 5;
+    }
+    .anfora__front {
+      left: 22px;
+      top: 100px;
+      width: 300px;
+      height: 154px;
+      clip-path: polygon(0 0, 100% 0, 92% 100%, 8% 100%);
+      background:
+        linear-gradient(118deg, rgba(255, 255, 255, 0.18), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025) 56%, rgba(212, 165, 116, 0.1)),
+        linear-gradient(135deg, rgba(16, 22, 36, 0.78), rgba(8, 12, 25, 0.54));
+      border: 1px solid rgba(255, 226, 184, 0.42);
+      border-radius: 0;
+      backdrop-filter: blur(4px) saturate(1.25);
+      box-shadow:
+        inset 0 0 72px rgba(212, 165, 116, 0.12),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+        18px 30px 62px -30px rgba(0, 0, 0, 0.82);
+      transform: none;
+      z-index: 4;
+    }
+    .anfora__front::before {
+      background:
+        linear-gradient(112deg, transparent 0 24%, rgba(255, 255, 255, 0.16) 25%, transparent 31%),
+        linear-gradient(90deg, transparent, rgba(212, 165, 116, 0.34), transparent);
+      opacity: 0.48;
+    }
+    .anfora__label {
+      top: 39px;
+      left: 53%;
+      font-size: 9px;
+      letter-spacing: 0.28em;
+      transform: translateX(-50%) rotate(-7deg);
+      z-index: 9;
+    }
+    .anfora__slot {
+      top: 54px;
+      left: 53%;
+      width: 138px;
+      height: 9px;
+      transform: translateX(-50%) rotate(-7deg);
+      z-index: 10;
+    }
+    .anfora__pile {
+      bottom: 18px;
+      left: 58px;
+      right: 34px;
+      height: 82px;
+      transform: skewX(-10deg) rotate(-3deg);
+      z-index: 4;
+    }
+    .anfora__glow {
+      bottom: 4px;
+      width: 74%;
+      height: 82px;
+    }
+
+    /* Final urn geometry: clean isometric box with connected edges */
+    .anfora {
+      bottom: 58px;
+      width: 430px;
+      height: 330px;
+      transform: translateX(-50%);
+      transform-style: flat;
+    }
+    .anfora__base {
+      left: 42px;
+      top: 288px;
+      width: 292px;
+      height: 18px;
+      clip-path: polygon(0 0, 100% 0, 92% 100%, 8% 100%);
+      background: linear-gradient(180deg, rgba(212, 165, 116, 0.22), rgba(5, 8, 18, 0.88));
+      border: 1px solid rgba(212, 165, 116, 0.24);
+      box-shadow: 0 28px 54px -24px rgba(0, 0, 0, 0.9);
+      z-index: 1;
+    }
+    .anfora__side {
+      left: 318px;
+      top: 126px;
+      width: 72px;
+      height: 160px;
+      clip-path: polygon(0 0, 100% 24%, 100% 84%, 0 100%);
+      background:
+        linear-gradient(115deg, rgba(255, 255, 255, 0.07), rgba(94, 166, 255, 0.08) 34%, rgba(4, 8, 18, 0.9)),
+        linear-gradient(180deg, rgba(19, 26, 42, 0.8), rgba(4, 7, 16, 0.95));
+      border: 1px solid rgba(212, 165, 116, 0.22);
+      box-shadow: inset -24px 0 36px rgba(0, 0, 0, 0.36);
+      z-index: 2;
+    }
+    .anfora__top {
+      left: 58px;
+      top: 78px;
+      width: 296px;
+      height: 76px;
+      clip-path: polygon(14% 100%, 0 46%, 82% 0, 100% 54%);
+      background:
+        linear-gradient(140deg, rgba(255, 255, 255, 0.18), transparent 30%),
+        linear-gradient(170deg, rgba(34, 42, 62, 0.92), rgba(9, 14, 28, 0.92) 70%, rgba(212, 165, 116, 0.12));
+      border: 1px solid rgba(255, 226, 184, 0.34);
+      box-shadow:
+        inset 0 0 28px rgba(255, 226, 184, 0.07),
+        0 14px 30px -20px rgba(212, 165, 116, 0.48);
+      overflow: visible;
+      z-index: 5;
+      display: none;
+    }
+    .anfora__front {
+      left: 42px;
+      top: 126px;
+      width: 276px;
+      height: 160px;
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+      background:
+        linear-gradient(116deg, rgba(255, 255, 255, 0.16), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025) 56%, rgba(212, 165, 116, 0.1)),
+        linear-gradient(135deg, rgba(16, 22, 36, 0.72), rgba(8, 12, 25, 0.52));
+      border: 1px solid rgba(255, 226, 184, 0.42);
+      border-radius: 2px;
+      backdrop-filter: blur(4px) saturate(1.2);
+      box-shadow:
+        inset 0 0 72px rgba(212, 165, 116, 0.12),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.055),
+        18px 30px 62px -30px rgba(0, 0, 0, 0.82);
+      transform: none;
+      z-index: 4;
+    }
+    .anfora__front::before {
+      background:
+        linear-gradient(110deg, transparent 0 22%, rgba(255, 255, 255, 0.14) 23%, transparent 31%),
+        linear-gradient(90deg, transparent, rgba(212, 165, 116, 0.26), transparent);
+      opacity: 0.42;
+    }
+    .anfora__front::after {
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      box-shadow: 0 -46px 40px rgba(212, 165, 116, 0.12);
+    }
+    .anfora__label {
+      top: 43px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-7deg);
+      font-size: 8px;
+      letter-spacing: 0.24em;
+      color: rgba(255, 226, 184, 0.6);
+      z-index: 12;
+    }
+    .anfora__slot {
+      top: 52px;
+      left: 50%;
+      width: 140px;
+      height: 10px;
+      transform: translateX(-50%) rotate(-7deg);
+      border-radius: 999px;
+      z-index: 13;
+    }
+    .anfora__pile {
+      bottom: 20px;
+      left: 46px;
+      right: 30px;
+      height: 86px;
+      transform: rotate(-2deg);
+      z-index: 5;
+    }
+    .pile-acta {
+      width: 54px;
+      height: 74px;
+      transform-origin: 50% 80%;
+    }
+    .anfora__glow {
+      bottom: 0;
+      width: 82%;
+      height: 84px;
+    }
+
+    /* Inner flash when an acta lands inside */
+    .anfora__inner-flash {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 100%;
+      background: radial-gradient(ellipse 80% 60% at 50% 70%, rgba(212, 165, 116, 0.6), transparent 70%);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    /* Number bubble that pops out from anfora when acta lands */
+    .pop-num {
+      position: absolute;
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+      pointer-events: none;
+      will-change: transform, opacity;
+      text-shadow: 0 0 12px rgba(212, 165, 116, 0.6);
+      z-index: 8;
+    }
+
+    .impact-spark {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(255, 226, 184, 0.95);
+      box-shadow: 0 0 14px rgba(255, 226, 184, 0.82);
+      pointer-events: none;
+      z-index: 9;
+    }
+
+    @keyframes beamScan {
+      0% { transform: translateY(-100%); opacity: 0; }
+      18% { opacity: 1; }
+      75% { opacity: 0.45; }
+      100% { transform: translateY(100%); opacity: 0; }
+    }
+    @keyframes intakeOrbit {
+      0% { opacity: 0.5; transform: rotateX(62deg) rotateZ(-18deg) scale(0.96); }
+      45% { opacity: 1; transform: rotateX(62deg) rotateZ(16deg) scale(1.04); }
+      100% { opacity: 0.75; transform: rotateX(62deg) rotateZ(-10deg) scale(1); }
+    }
+    @keyframes scanSweep {
+      0% { opacity: 0; transform: translateY(-34px); }
+      14% { opacity: 1; }
+      78% { opacity: 0.9; }
+      100% { opacity: 0; transform: translateY(132px); }
+    }
+
+    /* â”€â”€â”€ BIG STATS BAND â”€â”€â”€ */
+    .stats-band {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .stat-cell {
+      padding: 50px 40px;
+      border-right: 1px solid var(--border);
+      position: relative;
+    }
+    .stat-cell:last-child { border-right: none; }
+    .stat-cell label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .stat-cell .v {
+      font-family: var(--font-display);
+      font-size: clamp(48px, 5.5vw, 84px);
+      letter-spacing: -0.025em;
+      line-height: 0.95;
+      margin-top: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-cell .v em { font-style: italic; color: var(--accent); }
+    .stat-cell .desc {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+
+    /* â”€â”€â”€ PULL QUOTE â”€â”€â”€ */
+    .pull-quote-section {
+      padding: 120px 40px;
+      max-width: 1100px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .pull-quote {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: clamp(36px, 5vw, 68px);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+    .pull-quote em { font-style: italic; color: var(--accent); }
+    .pull-quote-section .attrib {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 30px;
+    }
+
+    /* â”€â”€â”€ FEATURE GRID â”€â”€â”€ */
+    .features-section {
+      padding: 60px 40px 120px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .features-section__head {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 60px;
+      align-items: end;
+      margin-bottom: 40px;
+    }
+    .features-section__head h2 {
+      font-family: var(--font-display);
+      font-size: clamp(40px, 5vw, 72px);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      margin-top: 12px;
+    }
+    .features-section__head h2 em { font-style: italic; color: var(--accent); }
+    .features-section__head p {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 22px;
+      line-height: 1.4;
+      color: var(--text-muted);
+      max-width: 460px;
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      overflow: hidden;
+    }
+    .feature {
+      background: var(--surface);
+      padding: 36px 32px;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: background 0.2s;
+    }
+    .feature:hover { background: var(--surface-2); }
+    .feature__num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      color: var(--text-faint);
+    }
+    .feature__title {
+      font-family: var(--font-display);
+      font-size: 32px;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      margin-top: 14px;
+    }
+    .feature__title em { font-style: italic; color: var(--accent); }
+    .feature__desc {
+      color: var(--text-muted);
+      font-size: 14.5px;
+      line-height: 1.55;
+      margin-top: 16px;
+    }
+    .feature__icon {
+      margin-top: 24px;
+      display: flex; gap: 8px; align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    /* â”€â”€â”€ CTA FINAL â”€â”€â”€ */
+    .cta-final {
+      padding: 140px 40px;
+      text-align: center;
+      border-top: 1px solid var(--border);
+      background:
+        radial-gradient(ellipse 60% 50% at 50% 30%, rgba(212, 165, 116, 0.06), transparent 70%);
+    }
+    .cta-final h2 {
+      font-family: var(--font-display);
+      font-size: clamp(48px, 6vw, 100px);
+      letter-spacing: -0.025em;
+      line-height: 0.95;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .cta-final h2 em { font-style: italic; color: var(--accent); }
+    .cta-final__btns {
+      display: flex; gap: 14px; justify-content: center;
+      margin-top: 40px;
+    }
+    .cta-final__btns .btn { padding: 16px 28px; font-size: 15px; }
+    .cta-final .small {
+      margin-top: 30px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    /* â”€â”€â”€ FOOTER â”€â”€â”€ */
+    footer {
+      padding: 30px 40px;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+
+    /* â”€â”€â”€ RESPONSIVE â”€â”€â”€ */
+    @media (max-width: 1100px) {
+      .topnav { padding: 18px 20px; }
+      .topnav__menu { display: none; }
+      .hero__head { top: 110px; left: 24px; right: 24px; }
+      .hero__live { display: none; }
+      .hero__cta-wrap { left: 24px; bottom: 28px; }
+      .hero__strip { display: none; }
+      .pipeline-section { grid-template-columns: 1fr; padding: 80px 24px; }
+      .anfora-stage { height: 420px; }
+      .stats-band { grid-template-columns: 1fr 1fr; }
+      .stat-cell:nth-child(2) { border-right: none; }
+      .features-section__head { grid-template-columns: 1fr; gap: 20px; }
+      .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+  <canvas class="ambient-particles" id="ambientParticles" aria-hidden="true"></canvas>
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <div class="topnav__brand">
+      <div class="brand-mark">â–²</div>
+      <strong>RRV<span style="color:var(--accent); font-style:italic;"> Bolivia</span></strong>
+    </div>
+    <div class="topnav__menu">
+      <a href="#sistema">Sistema</a>
+      <a href="/#dashboard" target="_parent">Dashboard</a>
+      <a href="/#mapa" target="_parent">Mapa</a>
+      <a href="/#actas" target="_parent">Actas</a>
+      <a href="/#pipeline" target="_parent">CÃ³mo funciona</a>
+      <a href="/#transp" target="_parent">Transparencia</a>
+    </div>
+    <div class="topnav__cta">
+      <a href="/#dashboard" target="_parent" class="btn btn--accent">Ver dashboard â†’</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <canvas id="worldCanvas"></canvas>
+    <div class="hero__sky"></div>
+    <div class="hero__grain"></div>
+    <div class="bolivia-map-anchor" id="boliviaMapAnchor" aria-hidden="true">
+      <img src="assets/bolivia.svg" alt="">
+    </div>
+
+    <!-- Floating acta popups -->
+    <div class="acta-popups" id="actaPopupHost"></div>
+
+    <!-- Hero text -->
+    <div class="hero__head">
+      <div class="hero__eyebrow">SISTEMA NACIONAL Â· RECUENTO RÃPIDO DE VOTOS</div>
+      <h1 class="hero__title">Cada acta,<br>en <em>minutos.</em></h1>
+      <p class="hero__lede">
+        De los 35 mil recintos de Bolivia al ciudadano, sin demoras. CÃ³mputo preliminar publicado en streaming â€” auditable de punta a punta.
+      </p>
+    </div>
+
+    <!-- Live counter top-right -->
+    <div class="hero__live">
+      <div class="hero__live-label">EN VIVO Â· 14:32:08</div>
+      <div class="hero__live-num" id="liveNum">2.847</div>
+      <div class="hero__live-foot">
+        <span>actas/min</span>
+        <span style="color: #16A34A;">+12% â†‘</span>
+      </div>
+    </div>
+
+    <!-- CTAs bottom-left -->
+    <div class="hero__cta-wrap">
+      <a href="/#dashboard" target="_parent" class="btn btn--accent">Ver resultados en vivo â†’</a>
+      <a href="/#pipeline" target="_parent" class="btn btn--ghost">CÃ³mo funciona</a>
+    </div>
+
+    <!-- Strip bottom-right -->
+    <div class="hero__strip">
+      <div><label>Actas</label><strong id="kActas">12.482</strong></div>
+      <div><label>Votos</label><strong id="kVotos">8.4M</strong></div>
+      <div><label>Mesas</label><strong>34.918</strong></div>
+      <div><label>Latencia</label><strong>3.8<span style="font-size:14px; color:var(--text-faint)">s</span></strong></div>
+    </div>
+  </section>
+
+  <!-- PIPELINE / ÃNFORA -->
+  <section class="pipeline-section" id="sistema">
+    <div class="pipeline-text">
+      <div class="eyebrow">Â§ 01 Â· DEL ACTA AL DASHBOARD</div>
+      <h2>Cuatro pasos.<br>Una <em>promesa</em>.</h2>
+      <p>Cada acta sigue un viaje preciso desde el recinto hasta el ciudadano. MirÃ¡ cÃ³mo entran al Ã¡nfora digital â€” en tiempo real.</p>
+      <ol>
+        <li><div><b>Captura <em>en el recinto</em></b><span>Un operador acreditado fotografÃ­a el acta firmada con la app oficial. SMS estructurado como respaldo donde no hay datos.</span></div></li>
+        <li><div><b>Lectura <em>OCR / SMS</em></b><span>VisiÃ³n computacional extrae los nÃºmeros celda por celda con score de confianza. Lo que no llega al umbral, va a revisiÃ³n humana.</span></div></li>
+        <li><div><b>ValidaciÃ³n <em>idempotente</em></b><span>Estructura, totales coherentes, no duplicados, cruzado con SMS. Cualquier conflicto se eleva al panel de auditorÃ­a en vivo.</span></div></li>
+        <li><div><b>PublicaciÃ³n <em>en streaming</em></b><span>El acta validada se proyecta al instante sobre el dashboard, mapa y API. Latencia objetivo &lt; 5 segundos.</span></div></li>
+      </ol>
+    </div>
+
+    <!-- ÃNFORA STAGE -->
+    <div class="anfora-stage" id="anforaStage">
+      <div class="anfora-beam" aria-hidden="true"></div>
+      <div class="anfora-field" aria-hidden="true"></div>
+      <div class="anfora-status" id="anforaStatus" aria-hidden="true">
+        Lectura OCR
+        <span>sincronizando acta</span>
+      </div>
+      <div class="anfora-scene">
+        <div class="anfora-ground"></div>
+        <div class="anfora-orbit" aria-hidden="true"></div>
+        <div class="anfora">
+          <div class="anfora__base" aria-hidden="true"></div>
+          <div class="anfora__side" aria-hidden="true"></div>
+          <div class="anfora__top">
+            <div class="anfora__label">RRV Â· BOLIVIA</div>
+            <div class="anfora__slot"></div>
+          </div>
+          <div class="anfora__front">
+            <div class="anfora__glow"></div>
+            <div class="anfora__pile" id="anforaPile"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BIG STATS BAND -->
+  <section class="stats-band">
+    <div class="stat-cell">
+      <label>JORNADA ELECTORAL</label>
+      <div class="v"><em>9</em></div>
+      <div class="desc">departamentos cubiertos en simultÃ¡neo, desde el altiplano hasta los llanos.</div>
+    </div>
+    <div class="stat-cell">
+      <label>RECINTOS</label>
+      <div class="v">5.368</div>
+      <div class="desc">unidades educativas y centros de votaciÃ³n con operadores acreditados.</div>
+    </div>
+    <div class="stat-cell">
+      <label>MESAS</label>
+      <div class="v">34<span style="font-size:0.5em">.</span>918</div>
+      <div class="desc">cada una emite un acta. Cada acta llega al sistema dos veces â€” foto + SMS.</div>
+    </div>
+    <div class="stat-cell">
+      <label>LATENCIA</label>
+      <div class="v"><em>3.8</em><span style="font-size:0.4em">s</span></div>
+      <div class="desc">desde que se aprieta el obturador hasta que el voto cuenta en el dashboard.</div>
+    </div>
+  </section>
+
+  <!-- PULL QUOTE -->
+  <section class="pull-quote-section">
+    <div class="pull-quote">
+      No reemplaza al cÃ³mputo oficial.<br><em>Lo complementa</em> â€” entregando claridad temprana al ciudadano mientras la auditorÃ­a profunda sigue su curso.
+    </div>
+    <div class="attrib">Â§ FILOSOFÃA DEL SISTEMA</div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features-section">
+    <div class="features-section__head">
+      <div>
+        <div class="eyebrow" style="color:var(--accent)">Â§ 02 Â· Â¿QUÃ‰ ENCONTRÃS?</div>
+        <h2>Una superficie<br>para <em>cada lente.</em></h2>
+      </div>
+      <p>Desde el ciudadano que quiere ver quiÃ©n va ganando, hasta el periodista que necesita los datos crudos. Una sola fuente de verdad â€” varias formas de leerla.</p>
+    </div>
+    <div class="features">
+      <a class="feature" href="/#dashboard" target="_parent">
+        <div>
+          <div class="feature__num">Â§ 02.1</div>
+          <div class="feature__title">Dashboard <em>nacional</em></div>
+          <div class="feature__desc">KPIs, ranking en tiempo real, mapa por departamento y ticker de actas â€” todo en una sola pantalla.</div>
+        </div>
+        <div class="feature__icon">VER â†’</div>
+      </a>
+      <a class="feature" href="/#mapa" target="_parent">
+        <div>
+          <div class="feature__num">Â§ 02.2</div>
+          <div class="feature__title">Mapa <em>por ciudad</em></div>
+          <div class="feature__desc">Bolivia coloreada por lÃ­der, margen, participaciÃ³n o avance del cÃ³mputo. Click para entrar al detalle.</div>
+        </div>
+        <div class="feature__icon">EXPLORAR â†’</div>
+      </a>
+      <a class="feature" href="/#actas" target="_parent">
+        <div>
+          <div class="feature__num">Â§ 02.3</div>
+          <div class="feature__title">Actas <em>recibidas</em></div>
+          <div class="feature__desc">Stream en vivo con filtros por estado, origen y ciudad. Modal con la imagen original y el log de procesamiento.</div>
+        </div>
+        <div class="feature__icon">CONSULTAR â†’</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="cta-final">
+    <h2>Resultados preliminares,<br><em>publicados sin demora.</em></h2>
+    <div class="cta-final__btns">
+      <a href="/#dashboard" target="_parent" class="btn btn--accent">Ir al dashboard</a>
+      <a href="/#transp" target="_parent" class="btn">Leer la metodologÃ­a</a>
+    </div>
+    <div class="small">âš  DEMO ACADÃ‰MICO Â· DATOS NO OFICIALES</div>
+  </section>
+
+  <footer>
+    <span>RRV BOLIVIA Â· v1.4.2</span>
+    <span>SISTEMA NO OFICIAL Â· DEMO ACADÃ‰MICO</span>
+  </footer>
+
+  <script src="assets/data.js"></script>
+  <script>
+  (function () {
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //   AMBIENT PARTICLES â€” subtle, mouse-aware
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const particleCanvas = document.getElementById('ambientParticles');
+    const particleCtx = particleCanvas.getContext('2d');
+    const particleMouse = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, active: false };
+    let ambientParticles = [];
+
+    function resizeParticles () {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      particleCanvas.width = Math.floor(window.innerWidth * dpr);
+      particleCanvas.height = Math.floor(window.innerHeight * dpr);
+      particleCanvas.style.width = window.innerWidth + 'px';
+      particleCanvas.style.height = window.innerHeight + 'px';
+      particleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const count = Math.min(110, Math.max(46, Math.floor(window.innerWidth * window.innerHeight / 15000)));
+      ambientParticles = Array.from({ length: count }, (_, i) => ({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        ox: Math.random() * window.innerWidth,
+        oy: Math.random() * window.innerHeight,
+        vx: (Math.random() - 0.5) * 0.12,
+        vy: (Math.random() - 0.5) * 0.12,
+        r: 0.7 + Math.random() * 1.8,
+        phase: Math.random() * Math.PI * 2,
+        hue: i % 5 === 0 ? '94, 166, 255' : '212, 165, 116',
+      }));
+    }
+
+    function drawAmbientParticles () {
+      particleCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      for (const p of ambientParticles) {
+        const dx = p.x - particleMouse.x;
+        const dy = p.y - particleMouse.y;
+        const dist = Math.hypot(dx, dy);
+        const force = particleMouse.active ? Math.max(0, 1 - dist / 190) : 0;
+        if (force > 0) {
+          const angle = Math.atan2(dy, dx);
+          p.vx += Math.cos(angle) * force * 0.018;
+          p.vy += Math.sin(angle) * force * 0.018;
+        }
+
+        p.phase += 0.01;
+        p.vx += Math.sin(p.phase) * 0.0018;
+        p.vy += Math.cos(p.phase * 0.8) * 0.0014;
+        p.vx *= 0.985;
+        p.vy *= 0.985;
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < -20) p.x = window.innerWidth + 20;
+        if (p.x > window.innerWidth + 20) p.x = -20;
+        if (p.y < -20) p.y = window.innerHeight + 20;
+        if (p.y > window.innerHeight + 20) p.y = -20;
+
+        const glow = 0.16 + force * 0.32 + Math.sin(p.phase) * 0.04;
+        particleCtx.beginPath();
+        particleCtx.fillStyle = `rgba(${p.hue}, ${glow})`;
+        particleCtx.arc(p.x, p.y, p.r + force * 1.6, 0, Math.PI * 2);
+        particleCtx.fill();
+
+        if (force > 0.15) {
+          particleCtx.beginPath();
+          particleCtx.strokeStyle = `rgba(${p.hue}, ${force * 0.16})`;
+          particleCtx.moveTo(p.x, p.y);
+          particleCtx.lineTo(p.x - p.vx * 44, p.y - p.vy * 44);
+          particleCtx.stroke();
+        }
+      }
+      requestAnimationFrame(drawAmbientParticles);
+    }
+
+    window.addEventListener('pointermove', event => {
+      particleMouse.x = event.clientX;
+      particleMouse.y = event.clientY;
+      particleMouse.active = true;
+    }, { passive: true });
+    window.addEventListener('pointerleave', () => { particleMouse.active = false; });
+    window.addEventListener('resize', resizeParticles);
+    resizeParticles();
+    drawAmbientParticles();
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //   3D WORLD GLOBE â€” focused on Bolivia
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const canvas = document.getElementById('worldCanvas');
+    const scene = new THREE.Scene();
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+    // Initial position; will be overridden once we compute Bolivia direction
+    camera.position.set(0, 0, 11);
+
+    function fit () {
+      const parent = canvas.parentElement;
+      // Force layout flush
+      parent.getBoundingClientRect();
+      const w = parent.clientWidth || window.innerWidth || 1280;
+      const h = parent.clientHeight || window.innerHeight || 720;
+      // updateStyle=true so CSS dimensions match â€” prevents canvas overflowing parent
+      renderer.setSize(w, h, true);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    // Synchronous initial fit + listeners
+    fit();
+    window.addEventListener('resize', fit);
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => fit()).observe(canvas.parentElement);
+    }
+
+    // World group â€” we rotate this to face Bolivia (~lat -17, lon -65)
+    const world = new THREE.Group();
+    scene.add(world);
+
+    // Globe radius
+    const R = 2.4;
+
+    // â”€â”€ INNER OPAQUE SPHERE (ocean) â”€â”€
+    const ocean = new THREE.Mesh(
+      new THREE.SphereGeometry(R * 0.99, 64, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0x0d1426,
+        roughness: 0.9, metalness: 0.1,
+        emissive: 0x0a1322, emissiveIntensity: 0.4,
+      })
+    );
+    world.add(ocean);
+
+    // â”€â”€ ATMOSPHERE GLOW (back side fresnel) â”€â”€
+    const atm = new THREE.Mesh(
+      new THREE.SphereGeometry(R * 1.06, 64, 48),
+      new THREE.ShaderMaterial({
+        transparent: true,
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: { glowColor: { value: new THREE.Color(0xD4A574) } },
+        vertexShader: `
+          varying vec3 vN;
+          void main () {
+            vN = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 glowColor;
+          varying vec3 vN;
+          void main () {
+            float intensity = pow(0.65 - dot(vN, vec3(0, 0, 1.0)), 2.2);
+            gl_FragColor = vec4(glowColor, 1.0) * intensity * 1.4;
+          }
+        `,
+      })
+    );
+    world.add(atm);
+
+    // â”€â”€ LATITUDE / LONGITUDE WIRE â”€â”€
+    const wireMat = new THREE.LineBasicMaterial({ color: 0x1d2944, transparent: true, opacity: 0.55 });
+    // latitudes
+    for (let lat = -75; lat <= 75; lat += 15) {
+      const phi = THREE.MathUtils.degToRad(90 - lat);
+      const r = R * 1.001 * Math.sin(phi);
+      const y = R * 1.001 * Math.cos(phi);
+      const seg = 64;
+      const pts = [];
+      for (let i = 0; i <= seg; i++) {
+        const t = i / seg * Math.PI * 2;
+        pts.push(new THREE.Vector3(r * Math.cos(t), y, r * Math.sin(t)));
+      }
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wireMat);
+      world.add(line);
+    }
+    // longitudes
+    for (let lon = 0; lon < 360; lon += 15) {
+      const seg = 64;
+      const pts = [];
+      const theta = THREE.MathUtils.degToRad(lon);
+      for (let i = 0; i <= seg; i++) {
+        const phi = i / seg * Math.PI;
+        pts.push(new THREE.Vector3(
+          R * 1.001 * Math.sin(phi) * Math.cos(theta),
+          R * 1.001 * Math.cos(phi),
+          R * 1.001 * Math.sin(phi) * Math.sin(theta),
+        ));
+      }
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wireMat);
+      world.add(line);
+    }
+
+    // â”€â”€ DOTTED CONTINENTS via spherical hashing of land mass â”€â”€
+    // We approximate continents using cheap analytic functions for speed (no texture fetch).
+    // We instead use a textured dot field generated from a simple low-res equirectangular procedural map.
+    function isLand (lat, lon) {
+      // Hand-crafted ellipses/rect approximations of the major land masses
+      // lat âˆˆ [-90, 90], lon âˆˆ [-180, 180]
+      const masses = [
+        // South America (broad cone) â€” make it precise around Bolivia
+        { fn: (la, lo) => {
+          if (lo < -82 || lo > -34) return false;
+          if (la > 13 || la < -56) return false;
+          // eastern bulge
+          const cx = -55, cy = -10;
+          const dx = (lo - cx) / 26;
+          const dy = (la - cy) / 28;
+          if (dx*dx + dy*dy < 1) return true;
+          // narrow tail (Chile/Argentina)
+          if (lo > -76 && lo < -53 && la < -10 && la > -55) return true;
+          return false;
+        } },
+        // North America
+        { fn: (la, lo) => {
+          if (lo < -170 || lo > -52) return false;
+          if (la < 8 || la > 75) return false;
+          const cx = -100, cy = 45;
+          const dx = (lo - cx) / 40, dy = (la - cy) / 28;
+          if (dx*dx + dy*dy < 1) return true;
+          // central america
+          if (lo > -110 && lo < -75 && la > 8 && la < 22) return true;
+          return false;
+        } },
+        // Africa
+        { fn: (la, lo) => {
+          if (lo < -18 || lo > 52) return false;
+          if (la < -36 || la > 38) return false;
+          const cx = 18, cy = 2;
+          const dx = (lo - cx) / 26, dy = (la - cy) / 35;
+          return dx*dx + dy*dy < 1;
+        } },
+        // Europe
+        { fn: (la, lo) => {
+          if (lo < -10 || lo > 50) return false;
+          if (la < 36 || la > 70) return false;
+          return true;
+        } },
+        // Asia
+        { fn: (la, lo) => {
+          if (lo < 25 || lo > 180) return false;
+          if (la < 0 || la > 78) return false;
+          const cx = 95, cy = 40;
+          const dx = (lo - cx) / 55, dy = (la - cy) / 38;
+          return dx*dx + dy*dy < 1;
+        } },
+        // Australia
+        { fn: (la, lo) => {
+          if (lo < 112 || lo > 155) return false;
+          if (la < -42 || la > -10) return false;
+          return true;
+        } },
+        // Greenland
+        { fn: (la, lo) => lo > -55 && lo < -22 && la > 60 && la < 84 },
+      ];
+      return masses.some(m => m.fn(lat, lon));
+    }
+
+    // Generate dotted land via instanced spheres
+    const dotGeo = new THREE.SphereGeometry(0.012, 6, 6);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0x6884b8 });
+    const dotMatBolivia = new THREE.MeshBasicMaterial({ color: 0xD4A574 });
+    const dotPositions = [];
+    const dotIsBolivia = [];
+
+    // Bolivia bounding box: lat [-23, -9.5], lon [-69.6, -57.5]
+    function inBolivia (lat, lon) {
+      if (lat < -23 || lat > -9.5) return false;
+      if (lon < -69.6 || lon > -57.5) return false;
+      // rough polygon
+      // exclude top-right (Brazil border curves)
+      if (lat > -10 && lon > -60) return false;
+      // exclude bottom corners
+      if (lat < -22 && lon < -67) return false;
+      return true;
+    }
+
+    // Sample evenly across sphere using Fibonacci lattice â€” good distribution
+    const N = 5200;
+    const phiBase = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < N; i++) {
+      const y = 1 - (i / (N - 1)) * 2;
+      const radius = Math.sqrt(1 - y * y);
+      const theta = phiBase * i;
+      const x = Math.cos(theta) * radius;
+      const z = Math.sin(theta) * radius;
+
+      const lat = THREE.MathUtils.radToDeg(Math.asin(y));
+      const lon = THREE.MathUtils.radToDeg(Math.atan2(z, x));
+
+      if (isLand(lat, lon)) {
+        dotPositions.push(new THREE.Vector3(x * R * 1.005, y * R * 1.005, z * R * 1.005));
+        dotIsBolivia.push(inBolivia(lat, lon));
+      }
+    }
+
+    // Use InstancedMesh for performance
+    const landDots = new THREE.InstancedMesh(dotGeo, dotMat, dotPositions.filter((_, i) => !dotIsBolivia[i]).length);
+    const boliviaDots = new THREE.InstancedMesh(dotGeo, dotMatBolivia, dotPositions.filter((_, i) => dotIsBolivia[i]).length);
+    let li = 0, bi = 0;
+    const tmp = new THREE.Object3D();
+    dotPositions.forEach((p, idx) => {
+      tmp.position.copy(p);
+      tmp.lookAt(0, 0, 0);
+      tmp.scale.setScalar(dotIsBolivia[idx] ? 1.6 : 1);
+      tmp.updateMatrix();
+      if (dotIsBolivia[idx]) {
+        boliviaDots.setMatrixAt(bi++, tmp.matrix);
+      } else {
+        landDots.setMatrixAt(li++, tmp.matrix);
+      }
+    });
+    world.add(landDots, boliviaDots);
+
+    // â”€â”€ BOLIVIA SHAPE OVERLAY (from SVG, projected onto sphere) â”€â”€
+    const boliviaShapeGroup = new THREE.Group();
+    // Keep this group detached so the DOM SVG is the single visible Bolivia map.
+    // The parser below still uses the SVG load as the readiness gate for popups.
+
+    let boliviaMapReadyResolve;
+    let boliviaMapProjected = false;
+    const boliviaMapReady = new Promise(resolve => {
+      boliviaMapReadyResolve = resolve;
+    });
+    function markBoliviaMapReady () {
+      if (boliviaMapProjected) return;
+      boliviaMapProjected = true;
+      boliviaMapReadyResolve();
+    }
+
+    fetch('assets/bolivia.svg').then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }).then(svgText => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const paths = doc.querySelectorAll('path');
+      // Compute combined bbox of all paths in SVG coords
+      const tmpSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      tmpSvg.style.position = 'absolute';
+      tmpSvg.style.opacity = '0';
+      tmpSvg.style.pointerEvents = 'none';
+      document.body.appendChild(tmpSvg);
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      const pathPts = [];
+      paths.forEach(p => {
+        const clone = p.cloneNode(true);
+        tmpSvg.appendChild(clone);
+        const length = clone.getTotalLength();
+        const samples = Math.max(60, Math.floor(length / 6));
+        const pts = [];
+        for (let i = 0; i <= samples; i++) {
+          const pt = clone.getPointAtLength(i / samples * length);
+          pts.push([pt.x, pt.y]);
+          if (pt.x < minX) minX = pt.x;
+          if (pt.x > maxX) maxX = pt.x;
+          if (pt.y < minY) minY = pt.y;
+          if (pt.y > maxY) maxY = pt.y;
+        }
+        pathPts.push({ id: p.id, pts });
+      });
+      document.body.removeChild(tmpSvg);
+
+      // Geographic bounds for Bolivia
+      const latMin = -23, latMax = -9.5;
+      const lonMin = -69.7, lonMax = -57.4;
+
+      function svgToLatLon (sx, sy) {
+        // Normalize svg coords to [0,1] (note: svg y increases downward)
+        const u = (sx - minX) / (maxX - minX);
+        const v = (sy - minY) / (maxY - minY);
+        const lon = lonMin + u * (lonMax - lonMin);
+        const lat = latMax - v * (latMax - latMin);
+        return [lat, lon];
+      }
+
+      // Draw outline lines on the sphere â€” each path as a closed loop slightly above surface
+      pathPts.forEach(({ id, pts }) => {
+        const linePts = pts.map(([sx, sy]) => {
+          const [lat, lon] = svgToLatLon(sx, sy);
+          return latLonToVec3(lat, lon, R * 1.018);
+        });
+        // Department fill â€” semi-transparent gold
+        const fillShape = [];
+        pts.forEach(([sx, sy]) => {
+          const [lat, lon] = svgToLatLon(sx, sy);
+          fillShape.push(latLonToVec3(lat, lon, R * 1.012));
+        });
+
+        // Outline line
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+        const lineMat = new THREE.LineBasicMaterial({
+          color: 0xFFE2B8,
+          transparent: true,
+          opacity: 0.9,
+          linewidth: 2,
+        });
+        const line = new THREE.LineLoop(lineGeo, lineMat);
+        boliviaShapeGroup.add(line);
+
+        // Glow underline (thicker, more transparent) layered behind
+        const glowGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+        const glowMat = new THREE.LineBasicMaterial({
+          color: 0xD4A574,
+          transparent: true,
+          opacity: 0.5,
+        });
+        const glowLine = new THREE.LineLoop(glowGeo, glowMat);
+        boliviaShapeGroup.add(glowLine);
+
+        // Department fill mesh (using triangle fan from centroid)
+        if (fillShape.length > 3) {
+          const cx = fillShape.reduce((s, p) => s + p.x, 0) / fillShape.length;
+          const cy = fillShape.reduce((s, p) => s + p.y, 0) / fillShape.length;
+          const cz = fillShape.reduce((s, p) => s + p.z, 0) / fillShape.length;
+          const centroid = new THREE.Vector3(cx, cy, cz).normalize().multiplyScalar(R * 1.011);
+
+          const positions = [];
+          for (let i = 0; i < fillShape.length - 1; i++) {
+            positions.push(centroid.x, centroid.y, centroid.z);
+            positions.push(fillShape[i].x, fillShape[i].y, fillShape[i].z);
+            positions.push(fillShape[i+1].x, fillShape[i+1].y, fillShape[i+1].z);
+          }
+          const fillGeo = new THREE.BufferGeometry();
+          fillGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+          fillGeo.computeVertexNormals();
+          const fillMat = new THREE.MeshBasicMaterial({
+            color: 0xD4A574,
+            transparent: true,
+            opacity: 0.16,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          });
+          const fillMesh = new THREE.Mesh(fillGeo, fillMat);
+          boliviaShapeGroup.add(fillMesh);
+        }
+      });
+      markBoliviaMapReady();
+    }).catch(err => {
+      console.warn('Bolivia SVG load failed:', err);
+      markBoliviaMapReady();
+    });
+
+    // â”€â”€ BOLIVIA HIGHLIGHT GLOW â”€â”€
+    // place a glowing disc on the surface where Bolivia is
+    const boliviaCenter = latLonToVec3(-17, -64.5, R * 1.012);
+    const glowDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.36, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xD4A574,
+        transparent: true,
+        opacity: 0.18,
+        depthWrite: false,
+      })
+    );
+    glowDisc.position.copy(boliviaCenter);
+    glowDisc.lookAt(0, 0, 0);
+    glowDisc.rotateY(Math.PI);
+    world.add(glowDisc);
+
+    // pulse ring
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.18, 0.20, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xD4A574,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      })
+    );
+    ring.position.copy(boliviaCenter);
+    ring.lookAt(0, 0, 0);
+    ring.rotateY(Math.PI);
+    world.add(ring);
+
+    // pin
+    const pin = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05, 16, 12),
+      new THREE.MeshBasicMaterial({ color: 0xFFE2B8 })
+    );
+    pin.position.copy(latLonToVec3(-17, -64.5, R * 1.05));
+    world.add(pin);
+
+    // arc lines from Bolivia to ~30 random "incoming" points (representing actas streaming in)
+    const arcsGroup = new THREE.Group();
+    world.add(arcsGroup);
+
+    function addArcFromBolivia (toLat, toLon, color = 0xD4A574, life = 1.6) {
+      const from = latLonToVec3(-17, -64.5, R * 1.005);
+      const to = latLonToVec3(toLat, toLon, R * 1.005);
+      const mid = from.clone().add(to).multiplyScalar(0.5).normalize().multiplyScalar(R * 1.45);
+      const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
+      const pts = curve.getPoints(40);
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 });
+      const line = new THREE.Line(geo, mat);
+      line.userData.life = life;
+      line.userData.t0 = clock.getElapsedTime();
+      arcsGroup.add(line);
+
+      // dot traveling
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.04, 10, 8),
+        new THREE.MeshBasicMaterial({ color: 0xFFE2B8 })
+      );
+      dot.userData.curve = curve;
+      dot.userData.t0 = clock.getElapsedTime();
+      dot.userData.life = life;
+      arcsGroup.add(dot);
+    }
+
+    function latLonToVec3 (lat, lon, r) {
+      const phi = THREE.MathUtils.degToRad(90 - lat);
+      const theta = THREE.MathUtils.degToRad(lon + 180);
+      return new THREE.Vector3(
+        -r * Math.sin(phi) * Math.cos(theta),
+         r * Math.cos(phi),
+         r * Math.sin(phi) * Math.sin(theta),
+      );
+    }
+
+    // Department capital pin glow points (subtle)
+    const depCoords = [
+      [-16.5, -68.15], // La Paz
+      [-17.78, -63.18], // Santa Cruz
+      [-17.39, -66.16], // Cochabamba
+      [-19.05, -65.26], // Sucre/Chuquisaca
+      [-19.59, -65.75], // PotosÃ­
+      [-17.96, -67.11], // Oruro
+      [-21.53, -64.73], // Tarija
+      [-14.83, -64.9], // Trinidad/Beni
+      [-11.02, -68.77], // Cobija/Pando
+    ];
+    depCoords.forEach(([lat, lon]) => {
+      const m = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 10, 8),
+        new THREE.MeshBasicMaterial({ color: 0xFFE2B8 })
+      );
+      m.position.copy(latLonToVec3(lat, lon, R * 1.015));
+      world.add(m);
+    });
+
+    // â”€â”€ LIGHTS â”€â”€
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const key = new THREE.DirectionalLight(0xffd9aa, 1.2);
+    key.position.set(3, 4, 5);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0x6688ff, 0.5);
+    rim.position.set(-4, -1, -3);
+    scene.add(rim);
+
+    // â”€â”€ ROTATE world to face Bolivia at center of viewport â”€â”€
+    // Strategy: leave world unrotated, position camera looking from Bolivia direction.
+    // Bolivia center vector (lat=-17, lon=-64.5) on unit sphere
+    const boliviaUnit = latLonToVec3(-17, -64.5, 1);
+    // Camera positioned along Bolivia's outward direction at distance 11
+    const camDist = 11;
+    camera.position.set(boliviaUnit.x * camDist, boliviaUnit.y * camDist + 0.3, boliviaUnit.z * camDist);
+    camera.lookAt(0, 0, 0);
+
+    // For mouse parallax we'll rotate the world group slightly
+    const targetYaw = 0;
+    const targetPitch = 0;
+
+    // Mouse parallax (subtle)
+    let mx = 0, my = 0;
+    window.addEventListener('mousemove', e => {
+      mx = (e.clientX / window.innerWidth - 0.5) * 0.18;
+      my = (e.clientY / window.innerHeight - 0.5) * 0.12;
+    });
+
+    // â”€â”€ ANIMATE â”€â”€
+    const clock = new THREE.Clock();
+    // One more fit pass after script has finished setting up DOM
+    fit();
+    function tick () {
+      const t = clock.getElapsedTime();
+      // Subtle camera-orbit drift around Bolivia direction for parallax + life
+      const driftYaw = Math.sin(t * 0.04) * 0.04 + mx;
+      const driftPitch = my * 0.8;
+      const baseAngleY = Math.atan2(boliviaUnit.x, boliviaUnit.z);
+      const baseAngleX = Math.asin(boliviaUnit.y);
+      const newY = baseAngleY + driftYaw;
+      const newX = baseAngleX + driftPitch;
+      // Spherical to cartesian for camera position
+      const horizR = camDist * Math.cos(newX);
+      camera.position.x = horizR * Math.sin(newY);
+      camera.position.y = camDist * Math.sin(newX) + 0.3;
+      camera.position.z = horizR * Math.cos(newY);
+      camera.lookAt(0, 0, 0);
+
+      // pulse ring
+      const phase = (t % 2.4) / 2.4;
+      ring.scale.setScalar(1 + phase * 4);
+      ring.material.opacity = 0.85 * (1 - phase);
+
+      // glow disc breathing
+      glowDisc.material.opacity = 0.18 + Math.sin(t * 1.2) * 0.06;
+
+      // Animate arcs traveling dots
+      arcsGroup.children.forEach(obj => {
+        const elapsed = t - obj.userData.t0;
+        const life = obj.userData.life || 2;
+        const u = elapsed / life;
+        if (obj.userData.curve) {
+          if (u >= 1) { arcsGroup.remove(obj); obj.geometry.dispose(); obj.material.dispose(); return; }
+          const pos = obj.userData.curve.getPoint(u);
+          obj.position.copy(pos);
+        } else if (obj.material) {
+          // line fading
+          if (u >= 1) { arcsGroup.remove(obj); obj.geometry.dispose(); obj.material.dispose(); return; }
+          obj.material.opacity = 0.6 * (1 - u);
+        }
+      });
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+    tick();
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //   ACTA POPUPS â€” float in randomly
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const D = window.RRV;
+    const f = D.fmt;
+    const popupHost = document.getElementById('actaPopupHost');
+    const boliviaMapAnchor = document.getElementById('boliviaMapAnchor');
+    const cities = ['La Paz','El Alto','Santa Cruz','Cochabamba','Sucre','Tarija','PotosÃ­','Oruro','Trinidad','Cobija'];
+    const recintos = ['U.E. San MartÃ­n','Colegio Don Bosco','U.E. Ayacucho','Colegio Pichincha','U.E. BolÃ­var','Colegio La Salle','U.E. Sucre','C. Trinidad','U.E. Cobija','C. Cochabamba'];
+    const estados = ['Publicada','Validada','En revisiÃ³n'];
+
+    let actaCount = 12482;
+    let popIdx = 0;
+
+    // Tick the live label clock
+    const liveLabel = document.querySelector('.hero__live-label');
+    function fmtTime () {
+      const n = new Date();
+      return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0') + ':' + String(n.getSeconds()).padStart(2,'0');
+    }
+    setInterval(() => { liveLabel.textContent = 'EN VIVO Â· ' + fmtTime(); }, 1000);
+    liveLabel.textContent = 'EN VIVO Â· ' + fmtTime();
+
+    function spawnPopup () {
+      if (!boliviaMapProjected || !boliviaMapAnchor) return;
+
+      popIdx++;
+      const c = cities[Math.floor(Math.random() * cities.length)];
+
+      // Anchor popups around the visible Bolivia SVG on the globe.
+      const heroEl = document.querySelector('.hero');
+      if (!heroEl) return;
+      const heroRect = heroEl.getBoundingClientRect();
+      const mapRect = boliviaMapAnchor.getBoundingClientRect();
+      const bolX = mapRect.left - heroRect.left + mapRect.width / 2;
+      const bolY = mapRect.top - heroRect.top + mapRect.height / 2;
+
+      // Random offset within ~100px radius of Bolivia, biased to right/upper
+      const directions = [
+        { dx:   96, dy: -38 },
+        { dx: -116, dy: -24 },
+        { dx:  108, dy:  42 },
+        { dx: -112, dy:  56 },
+        { dx:   42, dy: -82 },
+        { dx:  -82, dy: -76 },
+        { dx:  124, dy:   8 },
+        { dx: -130, dy:  30 },
+      ];
+      const off = directions[popIdx % directions.length];
+      const left = bolX + off.dx;
+      const top = bolY + off.dy;
+
+      const node = document.createElement('div');
+      node.className = 'acta-pop show';
+      node.style.left = left + 'px';
+      node.style.top = top + 'px';
+      node.innerHTML = `
+        <div class="acta-pop__row1">Nueva acta recibida</div>
+        <div class="acta-pop__title">${c}</div>
+        <div class="acta-pop__city">${fmtTime()}</div>
+      `;
+      popupHost.appendChild(node);
+
+      // Draw leader line from popup corner to Bolivia anchor
+      const leader = document.createElement('div');
+      leader.className = 'acta-pop__leader';
+      // Pop's bottom-left is at (left, top + height). We connect down-left to (bolX, bolY).
+      // Approximation: draw a 1px line from popup to anchor by computing length and angle.
+      requestAnimationFrame(() => {
+        const popRect = node.getBoundingClientRect();
+        const heroR2 = heroEl.getBoundingClientRect();
+        const px = popRect.left - heroR2.left + 14;
+        const py = popRect.top - heroR2.top + popRect.height;
+        const dx = bolX - px;
+        const dy = bolY - py;
+        const len = Math.hypot(dx, dy);
+        const ang = Math.atan2(dy, dx) * 180 / Math.PI - 90;
+        leader.style.left = px + 'px';
+        leader.style.top = py + 'px';
+        leader.style.height = len + 'px';
+        leader.style.transformOrigin = 'top';
+        leader.style.transform = `rotate(${ang}deg)`;
+        leader.style.position = 'absolute';
+        popupHost.appendChild(leader);
+      });
+
+      // Live numbers
+      actaCount += Math.floor(Math.random() * 3) + 1;
+      const kActas = document.getElementById('kActas');
+      if (kActas) kActas.textContent = actaCount.toLocaleString('es-BO');
+      const live = (2800 + Math.random() * 200).toFixed(0);
+      const liveNum = document.getElementById('liveNum');
+      if (liveNum) liveNum.textContent = Number(live).toLocaleString('es-BO');
+
+      setTimeout(() => { node.remove(); leader.remove(); }, 6100);
+    }
+
+    // Stagger initial popups only after Bolivia's SVG has been projected onto the globe.
+    boliviaMapReady.then(() => {
+      if (boliviaMapAnchor) boliviaMapAnchor.classList.add('is-ready');
+      setTimeout(spawnPopup, 250);
+      setTimeout(spawnPopup, 1400);
+      setTimeout(spawnPopup, 2550);
+      setInterval(spawnPopup, 2200);
+    });
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //   ÃNFORA â€” falling actas + counter pop
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const stage = document.getElementById('anforaStage');
+    const pile = document.getElementById('anforaPile');
+    let pileCount = 0;
+    let trailTimer = null;
+    let activeDrop = false;
+
+    function emitActaTrail (acta) {
+      if (!stage || !acta) return;
+      const stageRect = stage.getBoundingClientRect();
+      const actaRect = acta.getBoundingClientRect();
+      const dot = document.createElement('div');
+      dot.className = 'acta-trail';
+      dot.style.left = (actaRect.left - stageRect.left + actaRect.width * (0.35 + Math.random() * 0.3)) + 'px';
+      dot.style.top = (actaRect.top - stageRect.top + actaRect.height * (0.32 + Math.random() * 0.34)) + 'px';
+      stage.appendChild(dot);
+      gsap.to(dot, {
+        x: (Math.random() - 0.5) * 34,
+        y: 18 + Math.random() * 22,
+        scale: 0,
+        opacity: 0,
+        duration: 0.75,
+        ease: 'power2.out',
+        onComplete: () => dot.remove(),
+      });
+    }
+
+    function burstAtSlot () {
+      if (!stage) return;
+      const slot = stage.querySelector('.anfora__slot');
+      if (!slot) return;
+      const stageRect = stage.getBoundingClientRect();
+      const slotRect = slot.getBoundingClientRect();
+      const x = slotRect.left - stageRect.left + slotRect.width / 2;
+      const y = slotRect.top - stageRect.top + slotRect.height / 2;
+      for (let i = 0; i < 16; i++) {
+        const spark = document.createElement('div');
+        spark.className = 'impact-spark';
+        spark.style.left = x + 'px';
+        spark.style.top = y + 'px';
+        stage.appendChild(spark);
+        const angle = -Math.PI + (Math.PI * 2 * i / 16) + (Math.random() - 0.5) * 0.45;
+        const distance = 26 + Math.random() * 54;
+        gsap.to(spark, {
+          x: Math.cos(angle) * distance,
+          y: Math.sin(angle) * distance * 0.55,
+          scale: 0,
+          opacity: 0,
+          duration: 0.72 + Math.random() * 0.22,
+          ease: 'power2.out',
+          onComplete: () => spark.remove(),
+        });
+      }
+    }
+
+    function dropActaLegacy () {
+      const n1 = 60 + Math.floor(Math.random() * 60);
+      const n2 = 40 + Math.floor(Math.random() * 40);
+      const n3 = 25 + Math.floor(Math.random() * 30);
+      const acta = document.createElement('div');
+      acta.className = 'falling-acta';
+      const jitter = (Math.random() - 0.5) * 90;
+      const midJitter = (Math.random() - 0.5) * 34;
+      const startRotZ = -22 + Math.random() * 44;
+      acta.innerHTML = `
+        <div class="row"><span>P1</span><span>${n1}</span></div>
+        <div class="row"><span>P2</span><span>${n2}</span></div>
+        <div class="row"><span>P3</span><span>${n3}</span></div>
+        <div class="row"><span>BL</span><span>2</span></div>
+        <div class="seal">â˜…</div>
+      `;
+      stage.appendChild(acta);
+
+      // Use GSAP for full transform control
+      gsap.set(acta, {
+        top: -138,
+        x: jitter,
+        rotation: startRotZ,
+        rotationX: 22,
+        rotationY: -48 + Math.random() * 96,
+        scale: 0.96,
+        opacity: 0,
+        filter: 'blur(3px)',
+      });
+
+      const tl = gsap.timeline();
+      stage.classList.add('is-ingesting');
+      trailTimer = setInterval(() => emitActaTrail(acta), 70);
+      // Phase 1: enter from top, fade in
+      tl.to(acta, {
+        top: 30,
+        x: jitter * 0.42,
+        opacity: 1,
+        rotation: startRotZ * -0.35,
+        rotationX: -16,
+        rotationY: 38,
+        filter: 'blur(0px)',
+        duration: 0.42,
+        ease: 'power2.out',
+      });
+      // Phase 2: flutter while falling toward slot
+      tl.to(acta, {
+        top: 92,
+        x: midJitter,
+        rotation: startRotZ * 0.18,
+        rotationX: 12,
+        rotationY: -32,
+        skewX: -4,
+        duration: 0.46,
+        ease: 'sine.inOut',
+      });
+      // Phase 3: realign and accelerate into slot
+      tl.to(acta, {
+        top: 132,
+        x: 0,
+        rotation: 0,
+        rotationX: 68,
+        rotationY: 0,
+        skewX: 0,
+        scaleX: 0.92,
+        scaleY: 0.78,
+        duration: 0.28,
+        ease: 'power3.in',
+      });
+      // Phase 4: enter slot â€” squish vertically + fade
+      tl.to(acta, {
+        top: 150,
+        scaleY: 0.035,
+        scaleX: 0.62,
+        opacity: 0,
+        filter: 'blur(1px)',
+        duration: 0.13,
+        ease: 'power4.in',
+        onStart: () => {
+          // slot flashes
+          const slot = stage.querySelector('.anfora__slot');
+          if (slot) {
+            slot.classList.add('flash');
+            setTimeout(() => slot.classList.remove('flash'), 220);
+          }
+          burstAtSlot();
+        },
+        onComplete: () => {
+          clearInterval(trailTimer);
+          trailTimer = null;
+          stage.classList.remove('is-ingesting');
+          acta.remove();
+          // Inner flash
+          flashInside();
+          // Bounce Ã¡nfora
+          gsap.to(stage.querySelector('.anfora'), {
+            y: 4,
+            duration: 0.08,
+            yoyo: true, repeat: 1,
+            ease: 'power2.out',
+          });
+          addToPile();
+          popNumber();
+        },
+      });
+    }
+
+    function dropActa () {
+      if (activeDrop || !stage) return;
+      activeDrop = true;
+
+      const n1 = 60 + Math.floor(Math.random() * 60);
+      const n2 = 40 + Math.floor(Math.random() * 40);
+      const n3 = 25 + Math.floor(Math.random() * 30);
+      const acta = document.createElement('div');
+      const status = document.getElementById('anforaStatus');
+      const jitter = gsap.utils.random(-86, 86);
+      const midJitter = gsap.utils.random(-42, 42);
+      const startRotZ = gsap.utils.random(-24, 24);
+      if (status) status.innerHTML = 'Lectura OCR<span>sincronizando acta</span>';
+
+      acta.className = 'falling-acta';
+      acta.innerHTML = `
+        <div class="row"><span>P1</span><span>${n1}</span></div>
+        <div class="row"><span>P2</span><span>${n2}</span></div>
+        <div class="row"><span>P3</span><span>${n3}</span></div>
+        <div class="row"><span>BL</span><span>2</span></div>
+        <div class="seal">OK</div>
+      `;
+      stage.appendChild(acta);
+
+      gsap.set(acta, {
+        top: 0,
+        x: jitter,
+        y: -145,
+        rotation: startRotZ,
+        rotationX: 34,
+        rotationY: gsap.utils.random(-62, 62),
+        scale: 0.88,
+        autoAlpha: 0,
+        filter: 'blur(3px)',
+        transformPerspective: 900,
+      });
+      if (status) gsap.set(status, { autoAlpha: 0, y: 12, scale: 0.96 });
+
+      const anfora = stage.querySelector('.anfora');
+      stage.classList.add('is-ingesting', 'is-scanning');
+      trailTimer = setInterval(() => emitActaTrail(acta), 95);
+
+      gsap.timeline({
+        defaults: { overwrite: 'auto' },
+        onComplete: () => {
+          clearInterval(trailTimer);
+          trailTimer = null;
+          activeDrop = false;
+          stage.classList.remove('is-ingesting', 'is-scanning');
+          acta.remove();
+          flashInside();
+          addToPile();
+          popNumber();
+        },
+      })
+        .addLabel('summon', 0)
+        .to(status, {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.28,
+          ease: 'power2.out',
+        }, 'summon')
+        .to(acta, {
+          y: 10,
+          x: jitter * 0.42,
+          autoAlpha: 1,
+          rotation: startRotZ * -0.24,
+          rotationX: -18,
+          rotationY: 42,
+          scale: 1,
+          filter: 'blur(0px)',
+          duration: 0.54,
+          ease: 'power3.out',
+        }, 'summon+=0.06')
+        .addLabel('scan')
+        .to(status, {
+          innerHTML: 'Escaneo validado<span>checksum consistente</span>',
+          duration: 0.01,
+        }, 'scan')
+        .to(acta, {
+          y: 78,
+          x: midJitter,
+          rotation: startRotZ * 0.22,
+          rotationX: 10,
+          rotationY: -34,
+          skewX: -3,
+          duration: 0.46,
+          ease: 'sine.inOut',
+        }, 'scan')
+        .to('.anfora-field', {
+          opacity: 1,
+          scale: 1.03,
+          duration: 0.3,
+          yoyo: true,
+          repeat: 1,
+          ease: 'power2.inOut',
+        }, 'scan')
+        .addLabel('commit')
+        .to(acta, {
+          y: 132,
+          x: 0,
+          rotation: 0,
+          rotationX: 74,
+          rotationY: 0,
+          skewX: 0,
+          scaleX: 0.92,
+          scaleY: 0.72,
+          duration: 0.28,
+          ease: 'power3.in',
+        }, 'commit')
+        .to(status, {
+          autoAlpha: 0,
+          y: -8,
+          scale: 0.98,
+          duration: 0.18,
+          ease: 'power2.in',
+        }, 'commit+=0.06')
+        .addLabel('impact')
+        .to(acta, {
+          y: 150,
+          scaleY: 0.035,
+          scaleX: 0.58,
+          autoAlpha: 0,
+          filter: 'blur(1px)',
+          duration: 0.12,
+          ease: 'power4.in',
+          onStart: () => {
+            const slot = stage.querySelector('.anfora__slot');
+            if (slot) {
+              slot.classList.add('flash');
+              setTimeout(() => slot.classList.remove('flash'), 220);
+            }
+            burstAtSlot();
+          },
+        }, 'impact')
+        .to(anfora, {
+          y: 5,
+          rotationX: 2,
+          duration: 0.08,
+          yoyo: true,
+          repeat: 1,
+          ease: 'power2.out',
+        }, 'impact+=0.03');
+    }
+
+    function flashInside () {
+      const front = stage.querySelector('.anfora__front');
+      let flash = front.querySelector('.anfora__inner-flash');
+      if (!flash) {
+        flash = document.createElement('div');
+        flash.className = 'anfora__inner-flash';
+        front.appendChild(flash);
+      }
+      gsap.fromTo(flash, { opacity: 0 }, {
+        opacity: 1, duration: 0.12, yoyo: true, repeat: 1, ease: 'power2.out',
+      });
+    }
+
+    function addToPile () {
+      pileCount++;
+      const p = document.createElement('div');
+      p.className = 'pile-acta';
+      p.style.left = (10 + Math.random() * (220 - 60)) + 'px';
+      p.style.bottom = (Math.min(pileCount, 6) * 4) + 'px';
+      p.style.transform = `rotate(${(Math.random() - 0.5) * 14}deg) scale(0)`;
+      pile.appendChild(p);
+      gsap.to(p, { scale: 1, duration: 0.3, ease: 'back.out(2)' });
+
+      // limit pile size visually
+      if (pile.children.length > 14) {
+        const old = pile.firstChild;
+        gsap.to(old, { opacity: 0, duration: 0.4, onComplete: () => old.remove() });
+      }
+    }
+
+    function popNumber () {
+      // pop a +N indicator above the slot
+      const num = document.createElement('div');
+      num.className = 'pop-num';
+      num.textContent = '+' + (200 + Math.floor(Math.random() * 80));
+      num.style.left = '50%';
+      num.style.top = '90px';
+      num.style.transform = 'translateX(-50%)';
+      stage.appendChild(num);
+      gsap.to(num, {
+        top: 30,
+        opacity: 0,
+        scale: 1.3,
+        duration: 1.2,
+        ease: 'power2.out',
+        onComplete: () => num.remove(),
+      });
+    }
+
+    // Drop first actas (already in pile to give weight)
+    for (let i = 0; i < 5; i++) addToPile();
+
+    // ScrollTrigger: only run anfora drops when in view
+    if (window.gsap && window.ScrollTrigger) {
+      gsap.registerPlugin(ScrollTrigger);
+      let dropTimer = null;
+      ScrollTrigger.create({
+        trigger: stage,
+        start: 'top 80%',
+        end: 'bottom 20%',
+        onEnter: () => {
+          if (!dropTimer) {
+            dropActa();
+            dropTimer = setInterval(dropActa, 1500);
+          }
+        },
+        onLeave: () => { clearInterval(dropTimer); dropTimer = null; },
+        onEnterBack: () => {
+          if (!dropTimer) {
+            dropActa();
+            dropTimer = setInterval(dropActa, 1500);
+          }
+        },
+        onLeaveBack: () => { clearInterval(dropTimer); dropTimer = null; },
+      });
+
+      // â”€â”€ ENTRY ANIMATIONS â”€â”€
+      gsap.from('.hero__eyebrow, .hero__title, .hero__lede, .hero__live, .hero__cta-wrap, .hero__strip', {
+        y: 30, opacity: 0, duration: 1, stagger: 0.12, ease: 'power3.out',
+      });
+
+      gsap.from('.pipeline-text > *', {
+        y: 30, opacity: 0, duration: 0.7, stagger: 0.08, ease: 'power3.out',
+        scrollTrigger: { trigger: '.pipeline-section', start: 'top 75%' },
+      });
+      gsap.from('.anfora', {
+        y: 60, opacity: 0, duration: 1.2, ease: 'power3.out',
+        scrollTrigger: { trigger: '.anfora-stage', start: 'top 80%' },
+      });
+
+      gsap.utils.toArray('.stat-cell').forEach((el, i) => {
+        gsap.from(el, {
+          y: 40, opacity: 0, duration: 0.7, ease: 'power3.out',
+          scrollTrigger: { trigger: el, start: 'top 85%' },
+          delay: i * 0.05,
+        });
+      });
+
+      gsap.from('.pull-quote', {
+        opacity: 0, y: 20, duration: 1, ease: 'power3.out',
+        scrollTrigger: { trigger: '.pull-quote-section', start: 'top 70%' },
+      });
+
+      gsap.from('.feature', {
+        y: 40, opacity: 0, duration: 0.7, stagger: 0.1, ease: 'power3.out',
+        scrollTrigger: { trigger: '.features', start: 'top 80%' },
+      });
+
+      gsap.from('.cta-final h2, .cta-final__btns, .cta-final .small', {
+        y: 30, opacity: 0, duration: 0.8, stagger: 0.1, ease: 'power3.out',
+        scrollTrigger: { trigger: '.cta-final', start: 'top 75%' },
+      });
+    }
+
+    // Add some visual arcs from Bolivia outward periodically
+    setInterval(() => {
+      const lat = -50 + Math.random() * 80;
+      const lon = -150 + Math.random() * 230;
+      addArcFromBolivia(lat, lon);
+    }, 1100);
+
+  })();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard · RRV Bolivia</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+  <style>
+    .dash-grid {
+      padding: 28px 32px;
+      display: grid;
+      gap: 22px;
+    }
+    .dash-row {
+      display: grid;
+      gap: 22px;
+    }
+    .dash-row--2-1 { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+    .dash-row--1-1 { grid-template-columns: 1fr 1fr; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      padding: 24px;
+    }
+    .card-head { margin-bottom: 18px; }
+
+    /* Map block */
+    .map-block { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 30px; align-items: stretch; }
+    .map-svg-host { position: relative; min-height: 380px; }
+    .map-svg-host svg { width: 100%; height: 100%; }
+    .map-svg-host path {
+      cursor: pointer;
+      stroke: var(--bg-2);
+      stroke-width: 1.2;
+      transition: opacity 0.2s, filter 0.2s;
+    }
+    .map-svg-host path:hover { filter: brightness(1.2); opacity: 0.9; }
+
+    .legend-list {
+      display: flex; flex-direction: column;
+    }
+    .legend-row {
+      display: grid;
+      grid-template-columns: 14px 1fr 80px 70px;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px dashed var(--border);
+      align-items: center;
+      font-family: var(--font-display);
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .legend-row:hover { background: rgba(255,255,255,0.02); }
+    [data-theme="light"] .legend-row:hover { background: rgba(0,0,0,0.02); }
+    .legend-row:last-child { border-bottom: none; }
+    .legend-row .chip { width: 10px; height: 10px; border-radius: 2px; }
+    .legend-row .name { letter-spacing: -0.01em; }
+    .legend-row .pct { text-align: right; font-variant-numeric: tabular-nums; font-size: 16px; }
+    .legend-row .actas {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.05em;
+      text-align: right;
+    }
+
+    /* Tooltip */
+    .map-tt {
+      position: absolute;
+      pointer-events: none;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: 10px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow-2);
+      min-width: 200px;
+      opacity: 0;
+      transform: translate(-50%, calc(-100% - 14px));
+      transition: opacity 0.15s;
+      z-index: 5;
+    }
+    .map-tt.show { opacity: 1; }
+    .map-tt h5 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      letter-spacing: -0.01em;
+    }
+    .map-tt h5 em { font-style: italic; color: var(--accent); }
+    .map-tt .tt-row {
+      display: flex; justify-content: space-between;
+      font-family: var(--font-mono); font-size: 11px;
+      margin-top: 4px; color: var(--text-muted);
+    }
+
+    /* National */
+    .nat-head {
+      display: flex; justify-content: space-between; align-items: end;
+      margin-bottom: 16px;
+    }
+    .nat-leader {
+      font-family: var(--font-display);
+      font-size: 60px;
+      letter-spacing: -0.03em;
+      line-height: 0.9;
+    }
+    .nat-leader em { font-style: italic; color: var(--accent); }
+    .nat-leader .pct { color: var(--accent); }
+    .nat-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      text-align: right;
+    }
+
+    /* Stream */
+    .stream-list {
+      max-height: 360px;
+      overflow: auto;
+    }
+    .stream-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 90px 60px 70px;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 12px;
+      align-items: center;
+    }
+    .stream-row .id { font-family: var(--font-mono); color: var(--accent); }
+    .stream-row .recinto { font-family: var(--font-display); }
+    .stream-row .recinto small { display: block; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 2px; letter-spacing: 0.05em; }
+    .stream-row .estado { font-size: 10px; padding: 3px 7px; border-radius: 999px; text-align: center; }
+    .stream-row .conf { font-family: var(--font-mono); font-size: 11px; text-align: right; color: var(--text-muted); }
+    .stream-row .hora { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); text-align: right; }
+
+    /* Sparkline */
+    .sparkline { height: 60px; margin-top: 10px; }
+    .sparkline svg { width: 100%; height: 100%; overflow: visible; }
+    .sparkline path { fill: none; stroke: var(--accent); stroke-width: 2; }
+    .sparkline .area { fill: var(--accent); opacity: 0.15; }
+
+    @media (max-width: 1100px) {
+      .dash-row--2-1, .dash-row--1-1 { grid-template-columns: 1fr; }
+      .map-block { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <main class="main">
+      <div id="header-mount"></div>
+      <div id="root"></div>
+    </main>
+  </div>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/shell.js"></script>
+  <script>
+  (function () {
+    const D = window.RRV;
+    const f = D.fmt;
+
+    document.getElementById('header-mount').innerHTML = RRVShell.renderHeader({
+      title: 'Dashboard <em>en vivo</em>',
+      sub: 'Recuento Rápido de Votos · datos preliminares NO oficiales',
+    });
+    RRVShell.initShell('dashboard.html');
+
+    const actasPct = D.kpis.actasRecibidas / D.kpis.actasTotal * 100;
+    const lider = D.national.parties[0];
+
+    document.getElementById('root').innerHTML = `
+      <div class="dash-grid">
+
+        <!-- KPIs -->
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="kpi__label">Actas procesadas</div>
+            <div class="kpi__value">${f.n(D.kpis.actasRecibidas)}<span class="unit">/ ${f.n(D.kpis.actasTotal)}</span></div>
+            <div class="kpi__bar"><div class="kpi__bar-fill" style="width:0" data-w="${actasPct}"></div></div>
+            <div class="kpi__sub"><span>${actasPct.toFixed(1)}% completado</span><span>+12 / min</span></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__label">Votos contabilizados</div>
+            <div class="kpi__value">${f.n(D.kpis.votosProcesados / 1000)}<span class="unit">mil</span></div>
+            <div class="kpi__bar"><div class="kpi__bar-fill" style="width:0" data-w="74"></div></div>
+            <div class="kpi__sub"><span>74% del padrón estimado</span><span>↗</span></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__label">Participación</div>
+            <div class="kpi__value">${D.kpis.participacion}<span class="unit">%</span></div>
+            <div class="kpi__bar"><div class="kpi__bar-fill" style="width:0" data-w="${D.kpis.participacion}"></div></div>
+            <div class="kpi__sub"><span>turnout estimado</span><span>+0.4 vs 2020</span></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__label">Latencia mediana</div>
+            <div class="kpi__value">${D.kpis.latenciaSeg}<span class="unit">s</span></div>
+            <div class="kpi__bar"><div class="kpi__bar-fill" style="width:0" data-w="38"></div></div>
+            <div class="kpi__sub"><span>captura → publicación</span><span>SLA &lt;5s ✓</span></div>
+          </div>
+        </div>
+
+        <!-- Map + ranking -->
+        <div class="dash-row dash-row--2-1">
+          <div class="card">
+            <div class="card-head" style="display:flex; justify-content:space-between; align-items:end;">
+              <div>
+                <div class="card-title">Mapa <em>nacional</em></div>
+                <div class="card-sub">Líder por departamento · click para ver detalle</div>
+              </div>
+              <a href="mapa.html" class="btn">Ver mapa completo →</a>
+            </div>
+            <div class="map-block">
+              <div class="map-svg-host" id="mapHost">
+                <div class="map-tt" id="mapTT"></div>
+              </div>
+              <div class="legend-list" id="legendList"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Resultado <em>nacional</em></div>
+              <div class="card-sub">Acumulado preliminar</div>
+            </div>
+            <div class="nat-head">
+              <div>
+                <div class="nat-leader">${lider.name}<br><em>${lider.pct.toFixed(1)}<span class="pct">%</span></em></div>
+              </div>
+              <div class="nat-meta">
+                MARGEN<br>
+                <span style="font-family:var(--font-display); font-size:24px; color:var(--text); letter-spacing:-0.02em;">+${D.national.margenPp.toFixed(1)} pp</span>
+              </div>
+            </div>
+            ${D.national.parties.map(p => `
+              <div class="party-row">
+                <div class="party-row__head">
+                  <div class="party-row__name">
+                    <span class="party-row__chip" style="background:${p.color}"></span>
+                    <strong>${p.name}</strong>
+                    <span>${p.tag}</span>
+                  </div>
+                  <div class="party-row__pct" style="color:${p.color}">${p.pct.toFixed(1)}<span style="font-size:12px; color:var(--text-faint)">%</span></div>
+                </div>
+                <div class="party-row__bar">
+                  <div class="party-row__fill" style="background:${p.color}; width:0" data-w="${(p.pct / D.national.parties[0].pct) * 100}"></div>
+                </div>
+                <div class="party-row__meta">
+                  <span style="font-family:var(--font-mono); font-size:11px; color:var(--text-faint);">${f.n(p.votos)} VOTOS</span>
+                  <span style="font-family:var(--font-mono); font-size:11px; color:var(--text-faint);">${p.id === lider.id ? 'LÍDER' : '·'}</span>
+                </div>
+              </div>
+            `).join('')}
+            <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);">
+              <div>BLANCOS<br><span style="font-family:var(--font-display); font-size:18px; color:var(--text);">${f.n(D.national.blancos)}</span></div>
+              <div>NULOS<br><span style="font-family:var(--font-display); font-size:18px; color:var(--text);">${f.n(D.national.nulos)}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stream + sparkline -->
+        <div class="dash-row dash-row--1-1">
+          <div class="card">
+            <div class="card-head" style="display:flex; justify-content:space-between; align-items:end;">
+              <div>
+                <div class="card-title">Stream de <em>actas</em></div>
+                <div class="card-sub">Últimas registradas · tiempo real</div>
+              </div>
+              <a href="actas.html" class="btn">Ver tabla completa →</a>
+            </div>
+            <div class="stream-list">
+              ${D.actas.map(a => {
+                const e = D.estadoColores[a.estado];
+                return `
+                  <div class="stream-row">
+                    <span class="id">${a.id}</span>
+                    <span class="recinto">${a.recinto}<small>${a.ciudad.toUpperCase()} · ${a.mesa}</small></span>
+                    <span class="estado" style="background:${e.bg}; color:${e.fg};">${a.estado}</span>
+                    <span class="conf">${a.conf ? a.conf.toFixed(0) + '%' : '—'}</span>
+                    <span class="hora">${a.hora}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Llegada de <em>actas / hora</em></div>
+              <div class="card-sub">Curva del día · captura agregada</div>
+            </div>
+            <div class="sparkline" id="spark1"></div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 24px;">
+              <div>
+                <div style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); letter-spacing:0.12em;">PICO ACTAS / MIN</div>
+                <div style="font-family:var(--font-display); font-size:32px; letter-spacing:-0.02em; margin-top:4px;">142<span style="font-family:var(--font-sans); font-size:13px; color:var(--text-muted); margin-left:4px;">/min</span></div>
+                <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-faint); margin-top:2px;">Hora pico · 16:00–17:00</div>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); letter-spacing:0.12em;">REVISIÓN MANUAL</div>
+                <div style="font-family:var(--font-display); font-size:32px; letter-spacing:-0.02em; margin-top:4px; color:#D97706;">8.4<span style="font-family:var(--font-sans); font-size:13px; color:var(--text-muted); margin-left:4px;">%</span></div>
+                <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-faint); margin-top:2px;">cola humana</div>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); letter-spacing:0.12em;">DUPLICADAS</div>
+                <div style="font-family:var(--font-display); font-size:32px; letter-spacing:-0.02em; margin-top:4px; color:#DC2626;">0.6<span style="font-family:var(--font-sans); font-size:13px; color:var(--text-muted); margin-left:4px;">%</span></div>
+                <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-faint); margin-top:2px;">descartadas auto</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="disclaimer">⚠ Datos preliminares NO oficiales · Este RRV es una herramienta de transparencia ciudadana. El cómputo oficial corre por separado.</div>
+      </div>
+    `;
+
+    // Mount map
+    fetch('assets/bolivia.svg').then(r => r.text()).then(svg => {
+      const host = document.getElementById('mapHost');
+      const tt = host.querySelector('.map-tt');
+      host.insertAdjacentHTML('afterbegin', svg);
+      const svgEl = host.querySelector('svg');
+      svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      svgEl.style.width = '100%';
+      svgEl.style.height = '100%';
+
+      svgEl.querySelectorAll('path').forEach(p => {
+        const id = p.getAttribute('id');
+        const dept = D.departments.find(d => d.id === id);
+        if (dept) {
+          const lead = D.partyById(dept.leader);
+          p.style.fill = lead.color;
+          p.addEventListener('mouseenter', (e) => {
+            const lead = D.partyById(dept.leader);
+            tt.innerHTML = `
+              <h5><em>${dept.name}</em></h5>
+              <div class="tt-row"><span>LÍDER</span><span style="color:${lead.color}">${lead.name} ${dept.pct[dept.leader].toFixed(1)}%</span></div>
+              <div class="tt-row"><span>VOTOS</span><span>${f.n(dept.votos)}</span></div>
+              <div class="tt-row"><span>ACTAS</span><span>${dept.actas}/${dept.mesas}</span></div>
+            `;
+            tt.classList.add('show');
+          });
+          p.addEventListener('mousemove', (e) => {
+            const r = host.getBoundingClientRect();
+            tt.style.left = (e.clientX - r.left) + 'px';
+            tt.style.top = (e.clientY - r.top) + 'px';
+          });
+          p.addEventListener('mouseleave', () => tt.classList.remove('show'));
+          p.addEventListener('click', () => location.href = 'departamento.html?id=' + dept.id);
+        } else {
+          p.style.fill = 'var(--surface-2)';
+        }
+      });
+    });
+
+    // Legend list
+    document.getElementById('legendList').innerHTML = D.departments
+      .slice().sort((a, b) => b.votos - a.votos).map(d => {
+        const lead = D.partyById(d.leader);
+        return `
+          <a href="departamento.html?id=${d.id}" class="legend-row" style="text-decoration:none; color:inherit;">
+            <span class="chip" style="background:${lead.color}"></span>
+            <span class="name">${d.name}</span>
+            <span class="actas">${d.actas}/${d.mesas}</span>
+            <span class="pct" style="color:${lead.color}">${d.pct[d.leader].toFixed(1)}%</span>
+          </a>
+        `;
+      }).join('');
+
+    // Sparkline
+    setTimeout(() => {
+      const host = document.getElementById('spark1');
+      const W = host.clientWidth, H = 60;
+      const pts = [4, 8, 14, 22, 35, 58, 78, 95, 110, 128, 142, 138, 130, 118, 102, 90, 80, 72, 66, 60];
+      const max = Math.max(...pts);
+      const xs = i => (i / (pts.length - 1)) * W;
+      const ys = v => H - (v / max) * H;
+      const line = pts.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xs(i)} ${ys(v)}`).join(' ');
+      const area = line + ` L ${W} ${H} L 0 ${H} Z`;
+      host.innerHTML = `<svg viewBox="0 0 ${W} ${H}"><path class="area" d="${area}"/><path d="${line}"/></svg>`;
+    }, 50);
+
+    // Animate fills
+    requestAnimationFrame(() => {
+      document.querySelectorAll('[data-w]').forEach(el => el.style.width = el.dataset.w + '%');
+    });
+
+    if (window.gsap) {
+      gsap.from('.kpi', { y: 20, opacity: 0, stagger: 0.08, duration: 0.6, ease: 'power3.out' });
+      gsap.from('.card', { y: 30, opacity: 0, stagger: 0.1, duration: 0.7, delay: 0.2, ease: 'power3.out' });
+    }
+
+  })();
+  </script>
+</body>
+</html>

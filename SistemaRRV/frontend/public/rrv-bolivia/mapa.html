@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa por Ciudad · RRV Bolivia</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+  <style>
+    .mapa-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+      gap: 18px;
+      margin-top: 18px;
+      min-height: calc(100vh - 200px);
+    }
+    .mapa-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .mapa-card__head {
+      padding: 22px 26px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .mapa-card__svg {
+      flex: 1;
+      position: relative;
+      padding: 30px;
+      background:
+        radial-gradient(ellipse at 50% 50%, rgba(212, 165, 116, 0.04), transparent 70%),
+        var(--bg-2);
+      min-height: 540px;
+    }
+    .mapa-card__svg svg { width: 100%; height: 100%; }
+
+    /* Filter chips */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* Legend */
+    .map-legend {
+      position: absolute;
+      bottom: 22px; left: 30px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      display: flex; gap: 16px; flex-wrap: wrap;
+      backdrop-filter: blur(10px);
+    }
+    .map-legend__item { display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
+    .map-legend__chip { width: 11px; height: 11px; border-radius: 3px; }
+
+    /* Detail panel */
+    .detail-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .detail-empty {
+      flex: 1;
+      display: grid;
+      place-items: center;
+      padding: 60px 30px;
+      text-align: center;
+    }
+    .detail-empty__icon {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: 1px dashed var(--border-2);
+      display: grid; place-items: center;
+      color: var(--text-faint);
+      margin: 0 auto 20px;
+    }
+    .detail-empty h3 {
+      font-family: var(--font-display);
+      font-size: 26px;
+      letter-spacing: -0.01em;
+    }
+    .detail-empty p { color: var(--text-muted); font-size: 13px; margin-top: 8px; }
+
+    .detail__hero {
+      padding: 28px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .detail__hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .detail__eyebrow {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      display: flex; gap: 12px;
+    }
+    .detail__name {
+      font-family: var(--font-display);
+      font-size: 56px;
+      line-height: 0.95;
+      letter-spacing: -0.025em;
+      margin-top: 10px;
+    }
+    .detail__name em { font-style: italic; color: var(--accent); }
+    .detail__leader {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+    .detail__leader-chip { width: 14px; height: 14px; border-radius: 3px; }
+    .detail__leader-name {
+      font-family: var(--font-display);
+      font-size: 18px;
+      letter-spacing: -0.01em;
+    }
+    .detail__leader-pct {
+      font-family: var(--font-display);
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      margin-left: auto;
+      font-variant-numeric: tabular-nums;
+    }
+    .detail__metrics {
+      padding: 22px 28px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px 22px;
+    }
+    .detail__metric label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .detail__metric .v {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: -0.02em;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .detail__metric .desc {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .detail__bars {
+      padding: 22px 28px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .detail__bars h4 {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 12px;
+    }
+    .detail__progress {
+      padding: 18px 28px;
+      border-top: 1px solid var(--border);
+    }
+    .detail__progress label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .detail__progress .row {
+      display: flex; justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      font-family: var(--font-display);
+      letter-spacing: -0.01em;
+    }
+    .detail__progress .pct {
+      font-size: 22px;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    .detail__progress .frac {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .detail__progress .bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    [data-theme="light"] .detail__progress .bar { background: rgba(15, 23, 42, 0.08); }
+    .detail__progress .fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #E2BD8C);
+      border-radius: 999px;
+      transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .detail__cta {
+      padding: 18px 28px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+    }
+
+    /* Comparison strip below */
+    .compare-strip {
+      margin-top: 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      padding: 22px 26px;
+    }
+    .compare-strip__head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 18px;
+    }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .compare-cell {
+      padding: 16px 14px;
+      border-right: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .compare-cell:last-child { border-right: none; }
+    .compare-cell:hover { background: var(--surface-2); }
+    .compare-cell.is-selected {
+      background: var(--surface-2);
+      box-shadow: inset 0 -3px 0 var(--accent);
+    }
+    .compare-cell__name {
+      font-family: var(--font-display);
+      font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+    .compare-cell__chip {
+      display: inline-flex; gap: 4px; margin-top: 6px;
+    }
+    .compare-cell__pct {
+      font-family: var(--font-display);
+      font-size: 24px;
+      letter-spacing: -0.02em;
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+    .compare-cell__bar {
+      height: 3px;
+      margin-top: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    [data-theme="light"] .compare-cell__bar { background: rgba(15, 23, 42, 0.06); }
+    .compare-cell__fill { height: 100%; transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
+
+    @media (max-width: 1240px) {
+      .mapa-layout { grid-template-columns: 1fr; }
+      .compare-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <main class="main">
+      <div id="header-mount"></div>
+      <div class="app-content">
+
+        <!-- Filter bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 14px;">
+          <div class="filter-bar">
+            <span class="eyebrow">VISUALIZAR POR</span>
+            <button class="chip active" data-mode="leader">Líder</button>
+            <button class="chip" data-mode="margin">Margen</button>
+            <button class="chip" data-mode="participacion">Participación</button>
+            <button class="chip" data-mode="actas">Actas (%)</button>
+          </div>
+          <div class="filter-bar">
+            <span class="eyebrow">PARTIDO</span>
+            <button class="chip active" data-party="all">Todos</button>
+            <button class="chip" data-party="P1"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3B82F6;margin-right:5px;"></span>Partido 1</button>
+            <button class="chip" data-party="P2"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#EA580C;margin-right:5px;"></span>Partido 2</button>
+            <button class="chip" data-party="P3"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#8B5CF6;margin-right:5px;"></span>Partido 3</button>
+            <button class="chip" data-party="P4"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#059669;margin-right:5px;"></span>Partido 4</button>
+          </div>
+        </div>
+
+        <!-- Map + Detail -->
+        <div class="mapa-layout">
+          <div class="mapa-card">
+            <div class="mapa-card__head">
+              <div>
+                <div class="card-title">Bolivia <em>en vivo</em></div>
+                <div class="card-sub">Click en un departamento para ver el detalle</div>
+              </div>
+              <div class="filter-bar">
+                <button class="chip" id="zoomIn">+</button>
+                <button class="chip" id="zoomOut">−</button>
+                <button class="chip" id="zoomReset">⟲</button>
+              </div>
+            </div>
+            <div class="mapa-card__svg" id="mapaHost">
+              <div class="map-tooltip" id="mapTip"></div>
+              <div class="map-legend" id="mapLegend">
+                <div class="map-legend__item"><span class="map-legend__chip" style="background:#3B82F6"></span>Partido 1</div>
+                <div class="map-legend__item"><span class="map-legend__chip" style="background:#EA580C"></span>Partido 2</div>
+                <div class="map-legend__item"><span class="map-legend__chip" style="background:#8B5CF6"></span>Partido 3</div>
+                <div class="map-legend__item"><span class="map-legend__chip" style="background:#059669"></span>Partido 4</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DETAIL PANEL -->
+          <div class="detail-panel" id="detailPanel">
+            <div class="detail-empty" id="detailEmpty">
+              <div class="detail-empty__icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z M9 3v15 M15 6v15"/>
+                </svg>
+              </div>
+              <h3>Selecciona un <em style="font-style:italic; color:var(--accent)">departamento</em></h3>
+              <p>Hover para previsualizar, click para fijar el detalle.<br>9 departamentos disponibles.</p>
+            </div>
+            <div id="detailContent" style="display:none; flex:1; flex-direction:column;"></div>
+          </div>
+        </div>
+
+        <!-- Comparison strip -->
+        <div class="compare-strip">
+          <div class="compare-strip__head">
+            <div>
+              <div class="card-title">Los <em>9 departamentos</em></div>
+              <div class="card-sub">Comparación rápida · click para enfocar</div>
+            </div>
+            <span class="eyebrow">% DEL LÍDER</span>
+          </div>
+          <div class="compare-grid" id="compareGrid"></div>
+        </div>
+
+        <div class="disclaimer">
+          ⚠ Datos preliminares NO oficiales. Visualización generada a partir del flujo RRV (foto + OCR + SMS). El cómputo oficial corre por separado.
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/shell.js"></script>
+  <script>
+  (function () {
+    document.getElementById('header-mount').innerHTML = RRVShell.renderHeader({
+      title: '<em>Mapa</em> por ciudad',
+      sub: 'Bolivia · 9 departamentos · resultados preliminares',
+    });
+    RRVShell.initShell('mapa.html');
+
+    const D = window.RRV;
+    const f = D.fmt;
+    let currentMode = 'leader';
+    let currentParty = 'all';
+    let selectedId = null;
+    let zoom = 1;
+
+    // ─── LOAD MAP SVG ────────────────
+    fetch('assets/bolivia.svg').then(r => r.text()).then(svg => {
+      const host = document.getElementById('mapaHost');
+      host.insertAdjacentHTML('afterbegin', svg);
+      const svgEl = host.querySelector('svg');
+      svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      svgEl.style.width = '100%';
+      svgEl.style.height = '100%';
+      svgEl.style.maxHeight = '600px';
+
+      // Wire each path
+      svgEl.querySelectorAll('path').forEach(p => {
+        const id = p.getAttribute('id');
+        const dept = D.departments.find(d => d.id === id);
+        if (!dept) return;
+        p.style.cursor = 'pointer';
+        p.style.stroke = 'var(--bg-2)';
+        p.style.strokeWidth = '1.5';
+        p.style.transition = 'fill 0.4s, fill-opacity 0.2s, transform 0.25s';
+        p.style.transformOrigin = 'center';
+        p.style.transformBox = 'fill-box';
+
+        p.addEventListener('mouseenter', () => {
+          if (selectedId !== id) showTooltip(dept, p);
+          p.style.transform = 'scale(1.02)';
+          p.style.filter = 'brightness(1.18)';
+        });
+        p.addEventListener('mouseleave', () => {
+          if (selectedId !== id) hideTooltip();
+          p.style.transform = 'scale(1)';
+          p.style.filter = '';
+        });
+        p.addEventListener('click', () => selectDept(id));
+      });
+
+      paintMap();
+
+      gsap.from(svgEl.querySelectorAll('path'), {
+        opacity: 0, scale: 0.9, stagger: 0.06, duration: 0.6, ease: 'power3.out',
+        transformOrigin: 'center',
+      });
+    });
+
+    function paintMap () {
+      document.querySelectorAll('#mapaHost path').forEach(p => {
+        const id = p.getAttribute('id');
+        const dept = D.departments.find(d => d.id === id);
+        if (!dept) return;
+        let color = '#888';
+        let opacity = 0.85;
+
+        if (currentMode === 'leader') {
+          color = D.partyById(dept.leader).color;
+        } else if (currentMode === 'margin') {
+          // Brighter = bigger margin
+          const sorted = Object.entries(dept.pct).sort((a,b) => b[1] - a[1]);
+          const margin = sorted[0][1] - sorted[1][1];
+          color = D.partyById(dept.leader).color;
+          opacity = 0.4 + Math.min(margin / 25, 1) * 0.55;
+        } else if (currentMode === 'participacion') {
+          // Heatmap by participation
+          const t = (dept.participacion - 70) / 15;
+          color = `oklch(${60 + t * 18}% ${0.10 + t * 0.10} 70)`;
+        } else if (currentMode === 'actas') {
+          const t = dept.actas / dept.mesas;
+          color = `oklch(${50 + t * 30}% ${0.08 + t * 0.10} 60)`;
+        }
+
+        // Filter by party
+        if (currentParty !== 'all' && dept.leader !== currentParty) {
+          opacity = 0.18;
+        }
+
+        p.style.fill = color;
+        p.style.fillOpacity = opacity;
+      });
+    }
+
+    // ─── TOOLTIP ─────────────────────
+    const tip = document.getElementById('mapTip');
+    function showTooltip (d, pathEl) {
+      tip.innerHTML = `
+        <h4>${d.name}</h4>
+        <div class="map-tooltip__lead">
+          <span class="map-tooltip__lead-chip" style="background:${D.partyById(d.leader).color}"></span>
+          <span><b>${D.partyById(d.leader).name}</b> · ${d.pct[d.leader].toFixed(1)}%</span>
+        </div>
+        <div class="map-tooltip__row"><span>Capital</span><b>${d.capital}</b></div>
+        <div class="map-tooltip__row"><span>Actas</span><b>${f.n(d.actas)}/${f.n(d.mesas)}</b></div>
+        <div class="map-tooltip__row"><span>Participación</span><b>${d.participacion}%</b></div>
+      `;
+      const r = pathEl.getBoundingClientRect();
+      const hostR = document.getElementById('mapaHost').getBoundingClientRect();
+      tip.style.left = (r.left + r.width/2 - hostR.left) + 'px';
+      tip.style.top  = (r.top - hostR.top) + 'px';
+      tip.classList.add('visible');
+    }
+    function hideTooltip () { tip.classList.remove('visible'); }
+
+    // ─── SELECT DEPT ─────────────────
+    function selectDept (id) {
+      selectedId = id;
+      document.querySelectorAll('#mapaHost path').forEach(p => {
+        p.classList.toggle('is-selected', p.getAttribute('id') === id);
+      });
+      document.querySelectorAll('.compare-cell').forEach(c => {
+        c.classList.toggle('is-selected', c.dataset.id === id);
+      });
+      renderDetail(D.departments.find(d => d.id === id));
+      hideTooltip();
+    }
+
+    // ─── DETAIL PANEL ────────────────
+    function renderDetail (d) {
+      const empty = document.getElementById('detailEmpty');
+      const content = document.getElementById('detailContent');
+      empty.style.display = 'none';
+      content.style.display = 'flex';
+      const lead = D.partyById(d.leader);
+      const sortedPct = Object.entries(d.pct).sort((a,b) => b[1] - a[1]);
+      const max = sortedPct[0][1];
+      const margin = sortedPct[0][1] - sortedPct[1][1];
+      const actasPct = d.actas / d.mesas * 100;
+
+      content.innerHTML = `
+        <div class="detail__hero" style="background: linear-gradient(135deg, ${lead.color}26, transparent 60%);">
+          <div class="detail__eyebrow">
+            <span>${d.id}</span>
+            <span>CAPITAL · ${d.capital.toUpperCase()}</span>
+          </div>
+          <div class="detail__name">${d.name}</div>
+          <div class="detail__leader" style="border-color: ${lead.color}40;">
+            <span class="detail__leader-chip" style="background:${lead.color}"></span>
+            <span class="detail__leader-name">${lead.name}</span>
+            <span class="detail__leader-pct" style="color:${lead.color}">${d.pct[d.leader].toFixed(1)}%</span>
+          </div>
+        </div>
+
+        <div class="detail__metrics">
+          <div class="detail__metric">
+            <label>Votos preliminares</label>
+            <div class="v">${f.n(d.votos)}</div>
+            <div class="desc">contabilizados</div>
+          </div>
+          <div class="detail__metric">
+            <label>Margen del líder</label>
+            <div class="v" style="color:var(--accent)">+${margin.toFixed(1)} <span style="font-size:14px; color:var(--text-muted);">pp</span></div>
+            <div class="desc">vs. 2do lugar</div>
+          </div>
+          <div class="detail__metric">
+            <label>Mesas</label>
+            <div class="v">${f.n(d.mesas)}</div>
+            <div class="desc">en padrón</div>
+          </div>
+          <div class="detail__metric">
+            <label>Participación</label>
+            <div class="v">${d.participacion}<span style="font-size:14px; color:var(--text-muted);">%</span></div>
+            <div class="desc">turnout estimado</div>
+          </div>
+        </div>
+
+        <div class="detail__bars">
+          <h4>Distribución por partido</h4>
+          ${sortedPct.map(([pid, pct]) => {
+            const p = D.partyById(pid);
+            return `
+              <div class="party-row">
+                <div class="party-row__head">
+                  <div class="party-row__name">
+                    <span class="party-row__chip" style="background:${p.color}"></span>
+                    <strong>${p.name}</strong>
+                  </div>
+                  <div class="party-row__pct" style="color:${p.color}">${pct.toFixed(1)}%</div>
+                </div>
+                <div class="party-row__bar">
+                  <div class="party-row__fill" style="background:${p.color}; width:0;" data-w="${(pct/max)*100}"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="detail__progress">
+          <label>Actas procesadas</label>
+          <div class="row">
+            <span class="pct">${actasPct.toFixed(1)}%</span>
+            <span class="frac">${f.n(d.actas)} / ${f.n(d.mesas)}</span>
+          </div>
+          <div class="bar"><div class="fill" style="width:0" data-w="${actasPct}"></div></div>
+        </div>
+
+        <div class="detail__cta">
+          <a href="departamento.html?id=${d.id}" class="btn btn--accent" style="flex:1; justify-content:center;">Deep dive →</a>
+          <a href="actas.html?ciudad=${encodeURIComponent(d.name)}" class="btn">Ver actas</a>
+        </div>
+      `;
+
+      // Animate fills
+      requestAnimationFrame(() => {
+        content.querySelectorAll('[data-w]').forEach(el => el.style.width = el.dataset.w + '%');
+      });
+
+      gsap.from(content.children, { y: 16, opacity: 0, stagger: 0.07, duration: 0.5, ease: 'power3.out' });
+    }
+
+    // ─── ZOOM CONTROLS ───────────────
+    document.getElementById('zoomIn').addEventListener('click', () => { zoom = Math.min(2.4, zoom + 0.2); applyZoom(); });
+    document.getElementById('zoomOut').addEventListener('click', () => { zoom = Math.max(0.6, zoom - 0.2); applyZoom(); });
+    document.getElementById('zoomReset').addEventListener('click', () => { zoom = 1; applyZoom(); });
+    function applyZoom () {
+      const svg = document.querySelector('#mapaHost svg');
+      if (svg) svg.style.transform = `scale(${zoom})`;
+      svg && (svg.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)');
+      svg && (svg.style.transformOrigin = 'center center');
+    }
+
+    // ─── FILTER CHIPS ───────────────
+    document.querySelectorAll('[data-mode]').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('[data-mode]').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        currentMode = b.dataset.mode;
+        paintMap();
+      });
+    });
+    document.querySelectorAll('[data-party]').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('[data-party]').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        currentParty = b.dataset.party;
+        paintMap();
+      });
+    });
+
+    // ─── COMPARE GRID ───────────────
+    const grid = document.getElementById('compareGrid');
+    const maxVotos = Math.max(...D.departments.map(d => d.votos));
+    grid.innerHTML = D.departments.map(d => {
+      const lead = D.partyById(d.leader);
+      const others = D.parties.filter(p => p.id !== d.leader);
+      return `
+        <div class="compare-cell" data-id="${d.id}">
+          <div class="compare-cell__name">${d.name}</div>
+          <div class="compare-cell__chip">
+            <span style="width:7px;height:7px;border-radius:2px;background:${lead.color}"></span>
+            ${others.map(p => `<span style="width:7px;height:7px;border-radius:2px;background:${p.color};opacity:.4"></span>`).join('')}
+          </div>
+          <div class="compare-cell__pct" style="color:${lead.color}">${d.pct[d.leader].toFixed(0)}%</div>
+          <div class="compare-cell__bar">
+            <div class="compare-cell__fill" style="background:${lead.color}; width:0;" data-w="${(d.votos/maxVotos)*100}"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    grid.querySelectorAll('.compare-cell').forEach(c => {
+      c.addEventListener('click', () => selectDept(c.dataset.id));
+    });
+
+    // Auto-select La Paz
+    setTimeout(() => selectDept('BO-L'), 500);
+
+    // GSAP entries
+    gsap.from('.kpi, .filter-bar', { y: 20, opacity: 0, stagger: 0.05, duration: 0.6, ease: 'power3.out' });
+    gsap.from('.compare-cell', { y: 20, opacity: 0, stagger: 0.04, duration: 0.5, delay: 0.3, ease: 'power3.out' });
+    gsap.delayedCall(0.6, () => {
+      grid.querySelectorAll('[data-w]').forEach(el => el.style.width = el.dataset.w + '%');
+    });
+
+    // ─── LIVE NUMBER VARIATION ───
+    setInterval(() => {
+      D.departments.forEach(d => {
+        const drift = (Math.random() - 0.5) * 4;
+        d.actas = Math.min(d.mesas, Math.max(d.actas, d.actas + Math.max(0, Math.round(drift))));
+      });
+      if (selectedId) {
+        const d = D.departments.find(x => x.id === selectedId);
+        const v = document.querySelector('.detail__progress .pct');
+        const f2 = document.querySelector('.detail__progress .frac');
+        const fill = document.querySelector('.detail__progress .fill');
+        if (v && d) {
+          const pct = d.actas / d.mesas * 100;
+          v.textContent = pct.toFixed(1) + '%';
+          f2.textContent = f.n(d.actas) + ' / ' + f.n(d.mesas);
+          fill.style.width = pct + '%';
+        }
+      }
+    }, 3500);
+  })();
+  </script>
+</body>
+</html>

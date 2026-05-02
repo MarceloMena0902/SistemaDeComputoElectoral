@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Actas Recibidas · RRV Bolivia</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+  <style>
+    .actas-summary {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      margin-top: 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      overflow: hidden;
+    }
+    .actas-summary__cell {
+      padding: 22px 24px;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .actas-summary__cell:hover { background: var(--surface-2); }
+    .actas-summary__cell:last-child { border-right: none; }
+    .actas-summary__cell.is-active::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: 0; height: 3px;
+      background: var(--accent);
+    }
+    .actas-summary__cell label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .actas-summary__cell label .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+    }
+    .actas-summary__cell .v {
+      font-family: var(--font-display);
+      font-size: 36px;
+      letter-spacing: -0.02em;
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+    .actas-summary__cell .pct {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .actas-toolbar {
+      margin-top: 22px;
+      padding: 16px 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top-left-radius: var(--radius-l);
+      border-top-right-radius: var(--radius-l);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .actas-search {
+      flex: 1;
+      min-width: 240px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      transition: border-color 0.15s;
+    }
+    .actas-search:focus-within { border-color: var(--accent); }
+    .actas-search input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      outline: none;
+      font: inherit;
+      font-size: 13px;
+    }
+    .actas-search svg { color: var(--text-faint); }
+
+    .actas-tbl-host {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-bottom-left-radius: var(--radius-l);
+      border-bottom-right-radius: var(--radius-l);
+      overflow: hidden;
+    }
+    .actas-tbl-scroll {
+      overflow: auto;
+      max-height: calc(100vh - 460px);
+    }
+    .actas-tbl tr { transition: background 0.15s; cursor: pointer; }
+    .actas-tbl td.id-cell {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--accent);
+    }
+    .actas-tbl td.conf {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+    .actas-tbl .conf-bar {
+      width: 70px; height: 3px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 999px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 8px;
+      overflow: hidden;
+    }
+    [data-theme="light"] .actas-tbl .conf-bar { background: rgba(15, 23, 42, 0.06); }
+    .actas-tbl .conf-bar > span { display: block; height: 100%; background: var(--accent); }
+
+    .empty-state {
+      padding: 80px 30px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .actas-foot {
+      padding: 14px 22px;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(5, 8, 16, 0.7);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.25s;
+      padding: 30px;
+    }
+    .modal-overlay.visible { display: grid; place-items: center; opacity: 1; }
+    .modal {
+      width: min(960px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-l);
+      transform: scale(0.96) translateY(10px);
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+    }
+    .modal-overlay.visible .modal { transform: scale(1) translateY(0); }
+    .modal__main { padding: 28px; min-width: 0; }
+    .modal__side {
+      padding: 28px;
+      background: var(--bg-2);
+      border-left: 1px solid var(--border);
+      border-radius: 0 var(--radius-l) var(--radius-l) 0;
+    }
+    .modal__head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    .modal__head h2 {
+      font-family: var(--font-display);
+      font-size: 36px;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .modal__close {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      display: grid; place-items: center;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .modal__close:hover { border-color: var(--accent); color: var(--accent); }
+
+    .acta-doc {
+      background: linear-gradient(160deg, #FAFAF7, #E8E4D8);
+      color: #1F1B14;
+      border-radius: 12px;
+      padding: 22px;
+      margin-top: 16px;
+      font-family: 'Times New Roman', serif;
+      box-shadow: 0 20px 50px -10px rgba(0,0,0, 0.3);
+      transform: rotate(-0.4deg);
+    }
+    .acta-doc__head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding-bottom: 10px;
+      border-bottom: 2px double #1F1B14;
+    }
+    .acta-doc__head h3 { font-size: 18px; font-weight: 700; letter-spacing: 0.08em; }
+    .acta-doc__head span { font-size: 11px; color: #57503D; font-family: 'Courier New', monospace; }
+    .acta-doc__row {
+      display: flex; justify-content: space-between;
+      padding: 4px 0;
+      font-size: 12px;
+    }
+    .acta-doc__row b { font-weight: 600; }
+    .acta-doc__votes {
+      margin-top: 14px;
+      border-top: 1px dashed #1F1B14;
+      padding-top: 10px;
+    }
+    .acta-doc__vote-row {
+      display: grid;
+      grid-template-columns: 32px 1fr 60px 60px;
+      gap: 10px;
+      padding: 4px 0;
+      font-size: 13px;
+      border-bottom: 1px dotted rgba(0,0,0, 0.3);
+      align-items: center;
+    }
+    .acta-doc__vote-row:last-child { border-bottom: none; }
+    .acta-doc__vote-row b { font-weight: 700; font-family: 'Courier New', monospace; }
+    .acta-doc__total {
+      display: flex; justify-content: space-between;
+      padding-top: 10px; margin-top: 8px;
+      border-top: 2px double #1F1B14;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .acta-doc__sig {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .acta-doc__sig div {
+      text-align: center;
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+    }
+    .acta-doc__sig .line {
+      border-bottom: 1px solid #1F1B14;
+      height: 28px;
+      margin-bottom: 4px;
+    }
+
+    .timeline {
+      list-style: none;
+      padding: 0;
+      margin-top: 14px;
+    }
+    .timeline li {
+      position: relative;
+      padding: 10px 0 10px 26px;
+      border-bottom: 1px dashed var(--border);
+      font-size: 12.5px;
+    }
+    .timeline li:last-child { border-bottom: none; }
+    .timeline li::before {
+      content: '';
+      position: absolute;
+      left: 6px; top: 16px;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.18);
+    }
+    .timeline li.dim::before { background: var(--text-faint); box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.18); }
+    .timeline li::after {
+      content: '';
+      position: absolute;
+      left: 10px; top: 22px; bottom: -8px;
+      width: 1px;
+      background: var(--border);
+    }
+    .timeline li:last-child::after { display: none; }
+    .timeline label { color: var(--text-muted); font-size: 11px; }
+    .timeline span { display: block; margin-top: 2px; }
+
+    .modal__meta-row {
+      display: flex; justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 12px;
+    }
+    .modal__meta-row:last-child { border-bottom: none; }
+    .modal__meta-row label { color: var(--text-muted); }
+    .modal__meta-row b { font-family: var(--font-mono); }
+
+    @media (max-width: 1100px) {
+      .actas-summary { grid-template-columns: repeat(3, 1fr); }
+      .actas-summary__cell:nth-child(3n) { border-right: none; }
+      .modal { grid-template-columns: 1fr; }
+      .modal__side { border-left: none; border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-l) var(--radius-l); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <main class="main">
+      <div id="header-mount"></div>
+      <div class="app-content">
+
+        <!-- Summary by status -->
+        <div class="actas-summary" id="summaryStrip"></div>
+
+        <!-- Toolbar -->
+        <div class="actas-toolbar">
+          <div class="actas-search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" id="searchInput" placeholder="Buscar por ID, recinto, mesa, ciudad…">
+          </div>
+          <div class="filter-bar" id="originChips">
+            <span class="eyebrow">ORIGEN</span>
+            <button class="chip active" data-origen="all">Todos</button>
+            <button class="chip" data-origen="Foto/OCR">Foto/OCR</button>
+            <button class="chip" data-origen="SMS">SMS</button>
+          </div>
+          <button class="btn btn--ghost" id="exportBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12 M7 10l5 5 5-5 M5 21h14"/></svg>
+            Exportar CSV
+          </button>
+        </div>
+
+        <!-- Table -->
+        <div class="actas-tbl-host">
+          <div class="actas-tbl-scroll">
+            <table class="tbl actas-tbl" id="actasTbl">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>CIUDAD</th>
+                  <th>RECINTO</th>
+                  <th>MESA</th>
+                  <th>ORIGEN</th>
+                  <th>ESTADO</th>
+                  <th>CONFIANZA</th>
+                  <th>HORA</th>
+                </tr>
+              </thead>
+              <tbody id="actasBody"></tbody>
+            </table>
+          </div>
+          <div class="actas-foot">
+            <span id="rowCount">— actas mostradas</span>
+            <span>Stream en vivo · auto-refresh cada 3s</span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal" id="modalContent"></div>
+  </div>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/shell.js"></script>
+  <script>
+  (function () {
+    document.getElementById('header-mount').innerHTML = RRVShell.renderHeader({
+      title: '<em>Actas</em> recibidas',
+      sub: 'Stream en vivo desde recintos · OCR + SMS',
+    });
+    RRVShell.initShell('actas.html');
+
+    const D = window.RRV;
+    const f = D.fmt;
+    let actas = [...D.actas];
+    let filtroEstado = null;
+    let filtroOrigen = 'all';
+    let busqueda = '';
+
+    // ─── EXPAND DATASET ─────────────
+    // duplicate the seed list with new ids/times to fill the table
+    const cities = ['La Paz', 'Santa Cruz', 'Cochabamba', 'Tarija', 'Potosí', 'Oruro', 'Beni', 'Pando', 'Chuquisaca'];
+    const recintos = ['U.E. San Martín', 'Colegio Don Bosco', 'U.E. Ayacucho', 'Colegio Pichincha', 'U.E. Bolívar', 'Colegio La Salle', 'U.E. Sucre', 'Colegio Nacional', 'C. Trinidad', 'U.E. Cobija'];
+    const estados = ['Publicada', 'Validada', 'En revisión', 'Duplicada', 'Pendiente'];
+    const origenes = ['Foto/OCR', 'SMS'];
+    function rng (n) { return Math.floor(Math.random() * n); }
+    for (let i = 10498; i < 10570; i++) {
+      const e = estados[rng(estados.length)];
+      const isFoto = Math.random() > 0.3;
+      const conf = (e === 'Duplicada' || e === 'Pendiente') ? null
+                   : (e === 'En revisión') ? 80 + Math.random() * 9
+                   : 90 + Math.random() * 9;
+      actas.push({
+        id: 'A-' + i,
+        ciudad: cities[rng(cities.length)],
+        recinto: recintos[rng(recintos.length)],
+        mesa: 'Mesa ' + String(rng(800)).padStart(3, '0'),
+        origen: isFoto ? 'Foto/OCR' : 'SMS',
+        estado: e,
+        conf: conf == null ? null : +conf.toFixed(1),
+        hora: '14:' + String(rng(60)).padStart(2,'0') + ':' + String(rng(60)).padStart(2,'0'),
+      });
+    }
+    actas.sort((a, b) => b.id.localeCompare(a.id));
+
+    // ─── SUMMARY STRIP ──────────────
+    function renderSummary () {
+      const counts = { all: actas.length };
+      estados.forEach(e => counts[e] = 0);
+      actas.forEach(a => counts[a.estado]++);
+      const total = counts.all;
+      const items = [
+        { k: null,            label: 'Todas',        v: counts.all,            color: 'var(--text)',     dot: 'var(--text-faint)' },
+        { k: 'Publicada',     label: 'Publicadas',   v: counts['Publicada'],   color: '#16A34A',        dot: '#16A34A' },
+        { k: 'Validada',      label: 'Validadas',    v: counts['Validada'],    color: '#2563EB',        dot: '#2563EB' },
+        { k: 'En revisión',   label: 'En revisión',  v: counts['En revisión'], color: '#D97706',        dot: '#D97706' },
+        { k: 'Duplicada',     label: 'Duplicadas',   v: counts['Duplicada'],   color: '#DC2626',        dot: '#DC2626' },
+      ];
+      document.getElementById('summaryStrip').innerHTML = items.map(it => `
+        <div class="actas-summary__cell ${filtroEstado === it.k ? 'is-active' : ''}" data-estado="${it.k || ''}">
+          <label><span class="dot" style="background:${it.dot}"></span>${it.label}</label>
+          <div class="v" style="color:${it.color}">${f.n(it.v)}</div>
+          <div class="pct">${it.v ? ((it.v/total)*100).toFixed(1) + '% del total' : '—'}</div>
+        </div>
+      `).join('');
+      document.querySelectorAll('.actas-summary__cell').forEach(c => {
+        c.addEventListener('click', () => {
+          const v = c.dataset.estado || null;
+          filtroEstado = filtroEstado === v ? null : v;
+          renderSummary();
+          renderTable();
+        });
+      });
+    }
+
+    // ─── TABLE ──────────────────────
+    function renderTable () {
+      let rows = actas.filter(a => {
+        if (filtroEstado && a.estado !== filtroEstado) return false;
+        if (filtroOrigen !== 'all' && a.origen !== filtroOrigen) return false;
+        if (busqueda) {
+          const q = busqueda.toLowerCase();
+          if (!`${a.id} ${a.ciudad} ${a.recinto} ${a.mesa}`.toLowerCase().includes(q)) return false;
+        }
+        return true;
+      });
+
+      const tbody = document.getElementById('actasBody');
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Sin resultados con esos filtros</td></tr>`;
+      } else {
+        tbody.innerHTML = rows.map(a => {
+          const e = D.estadoColores[a.estado];
+          return `
+            <tr data-id="${a.id}">
+              <td class="id-cell">${a.id}</td>
+              <td>${a.ciudad}</td>
+              <td class="dim">${a.recinto}</td>
+              <td class="mono">${a.mesa}</td>
+              <td>
+                <span class="origen">
+                  ${a.origen === 'Foto/OCR' ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="4"/><path d="M9 6l1.5-2h3L15 6"/></svg>` :
+                  `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-7l-5 4v-4H6a3 3 0 0 1-3-3z"/></svg>`}
+                  ${a.origen}
+                </span>
+              </td>
+              <td><span class="estado-badge" style="background:${e.bg}; color:${e.fg}">${a.estado}</span></td>
+              <td class="conf">
+                ${a.conf == null ? '<span style="color:var(--text-faint)">—</span>' : `${a.conf.toFixed(1)}%<span class="conf-bar"><span style="width:${a.conf}%; background:${e.dot}"></span></span>`}
+              </td>
+              <td class="mono dim">${a.hora}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+      tbody.querySelectorAll('tr[data-id]').forEach(tr => {
+        tr.addEventListener('click', () => openModal(tr.dataset.id));
+      });
+      document.getElementById('rowCount').textContent = `${f.n(rows.length)} actas mostradas · ${f.n(actas.length)} totales`;
+    }
+
+    document.getElementById('searchInput').addEventListener('input', e => {
+      busqueda = e.target.value;
+      renderTable();
+    });
+    document.querySelectorAll('[data-origen]').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('[data-origen]').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        filtroOrigen = b.dataset.origen;
+        renderTable();
+      });
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const lines = ['ID,Ciudad,Recinto,Mesa,Origen,Estado,Confianza,Hora'];
+      actas.forEach(a => lines.push(`${a.id},${a.ciudad},${a.recinto},${a.mesa},${a.origen},${a.estado},${a.conf || ''},${a.hora}`));
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'actas.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // ─── MODAL ──────────────────────
+    function openModal (id) {
+      const a = actas.find(x => x.id === id);
+      if (!a) return;
+      const e = D.estadoColores[a.estado];
+      // Make up vote distribution
+      const totalVotos = 240 + Math.floor(Math.random() * 80);
+      const dist = D.parties.map((p, i) => ({
+        ...p, v: Math.floor(totalVotos * (0.36 - i * 0.07 + Math.random() * 0.04)),
+      }));
+      const distSum = dist.reduce((s, x) => s + x.v, 0);
+
+      document.getElementById('modalContent').innerHTML = `
+        <div class="modal__main">
+          <div class="modal__head">
+            <div>
+              <div class="eyebrow" style="margin-bottom:6px">ACTA · DETALLE</div>
+              <h2>${a.id}</h2>
+            </div>
+            <button class="modal__close" id="modalClose">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12 M18 6l-12 12"/></svg>
+            </button>
+          </div>
+
+          <div class="modal__meta-row"><label>Ciudad</label><b>${a.ciudad}</b></div>
+          <div class="modal__meta-row"><label>Recinto</label><b>${a.recinto}</b></div>
+          <div class="modal__meta-row"><label>Mesa</label><b>${a.mesa}</b></div>
+          <div class="modal__meta-row"><label>Origen</label><b>${a.origen}</b></div>
+          <div class="modal__meta-row"><label>Estado</label><b><span class="estado-badge" style="background:${e.bg}; color:${e.fg}">${a.estado}</span></b></div>
+          <div class="modal__meta-row"><label>Confianza OCR</label><b>${a.conf == null ? '—' : a.conf.toFixed(1) + '%'}</b></div>
+          <div class="modal__meta-row"><label>Hash del acta</label><b style="font-size:10px;">sha256:${a.id.replace('A-', '')}…d4f8b21a</b></div>
+
+          <div class="acta-doc">
+            <div class="acta-doc__head">
+              <h3>ACTA ELECTORAL</h3>
+              <span>${a.id} · ${a.mesa}</span>
+            </div>
+            <div class="acta-doc__row"><span>Recinto:</span><b>${a.recinto}</b></div>
+            <div class="acta-doc__row"><span>Localidad:</span><b>${a.ciudad}, Bolivia</b></div>
+            <div class="acta-doc__row"><span>Hora cierre:</span><b>${a.hora}</b></div>
+            <div class="acta-doc__votes">
+              ${dist.map((p, i) => `
+                <div class="acta-doc__vote-row">
+                  <span style="display:inline-block;width:14px;height:14px;background:${p.color};border-radius:2px"></span>
+                  <span>${p.name}</span>
+                  <b>${p.v}</b>
+                  <span style="text-align:right; opacity:.7">${((p.v/distSum)*100).toFixed(1)}%</span>
+                </div>
+              `).join('')}
+              <div class="acta-doc__vote-row"><span></span><span style="opacity:.7">Blancos</span><b>4</b><span></span></div>
+              <div class="acta-doc__vote-row"><span></span><span style="opacity:.7">Nulos</span><b>2</b><span></span></div>
+            </div>
+            <div class="acta-doc__total">
+              <span>TOTAL VÁLIDOS</span><span>${distSum}</span>
+            </div>
+            <div class="acta-doc__sig">
+              <div><div class="line"></div>PRESIDENTE/A</div>
+              <div><div class="line"></div>SECRETARIO/A</div>
+              <div><div class="line"></div>VOCAL</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal__side">
+          <div class="eyebrow" style="margin-bottom: 8px">PIPELINE</div>
+          <h3 style="font-family:var(--font-display); font-size: 22px; letter-spacing: -0.01em;">Procesamiento <em style="color:var(--accent); font-style:italic">paso a paso</em></h3>
+          <ul class="timeline">
+            <li>
+              <label>${a.hora} · CAPTURA</label>
+              <span><b>Foto enviada</b> desde el recinto al servidor de ingesta.</span>
+            </li>
+            <li>
+              <label>${shift(a.hora, 4)} · OCR / SMS</label>
+              <span>Extracción de votos · <b>${a.conf == null ? 'sin score' : a.conf.toFixed(1) + '% confianza'}</b></span>
+            </li>
+            <li class="${a.estado === 'Pendiente' ? 'dim' : ''}">
+              <label>${shift(a.hora, 8)} · VALIDACIÓN</label>
+              <span>${a.estado === 'Duplicada' ? 'Marcada como <b style="color:#DC2626">duplicada</b>; descartada del cómputo.' : 'Estructura verificada · totales coherentes.'}</span>
+            </li>
+            <li class="${(a.estado === 'Publicada' || a.estado === 'Validada') ? '' : 'dim'}">
+              <label>${shift(a.hora, 12)} · PUBLICACIÓN</label>
+              <span>${a.estado === 'Publicada' ? '<b style="color:#16A34A">Publicada</b> en el dashboard.' : 'Pendiente de publicación.'}</span>
+            </li>
+          </ul>
+
+          <div style="margin-top: 24px;">
+            <div class="eyebrow" style="margin-bottom: 8px;">ACCIONES</div>
+            <button class="btn" style="width:100%; justify-content: center; margin-bottom: 6px;">Ver imagen original</button>
+            <button class="btn" style="width:100%; justify-content: center;">Reproceso manual</button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('modal').classList.add('visible');
+      document.getElementById('modalClose').addEventListener('click', closeModal);
+    }
+    function closeModal () { document.getElementById('modal').classList.remove('visible'); }
+    document.getElementById('modal').addEventListener('click', e => {
+      if (e.target.id === 'modal') closeModal();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    function shift (hora, addSec) {
+      const [h, m, s] = hora.split(':').map(Number);
+      let total = h*3600 + m*60 + s + addSec;
+      const hh = String(Math.floor(total/3600)).padStart(2, '0');
+      total %= 3600;
+      const mm = String(Math.floor(total/60)).padStart(2, '0');
+      const ss = String(total%60).padStart(2, '0');
+      return `${hh}:${mm}:${ss}`;
+    }
+
+    // ─── INIT ───────────────────────
+    renderSummary();
+    renderTable();
+
+    // Read URL filter (?ciudad=)
+    const params = new URLSearchParams(location.search);
+    const ciudadParam = params.get('ciudad');
+    if (ciudadParam) {
+      busqueda = ciudadParam;
+      document.getElementById('searchInput').value = ciudadParam;
+      renderTable();
+    }
+
+    gsap.from('.actas-summary__cell', { y: 16, opacity: 0, stagger: 0.05, duration: 0.6, ease: 'power3.out' });
+    gsap.from('.actas-toolbar, .actas-tbl-host', { y: 20, opacity: 0, duration: 0.7, delay: 0.2, ease: 'power3.out' });
+
+    // ─── LIVE: insert new acta every 4-7 seconds ──
+    setInterval(() => {
+      const id = 'A-' + (10570 + Math.floor(Math.random() * 10000));
+      const e = estados[rng(estados.length)];
+      const isFoto = Math.random() > 0.3;
+      const conf = (e === 'Duplicada' || e === 'Pendiente') ? null : 85 + Math.random() * 14;
+      const newActa = {
+        id, ciudad: cities[rng(cities.length)],
+        recinto: recintos[rng(recintos.length)],
+        mesa: 'Mesa ' + String(rng(800)).padStart(3, '0'),
+        origen: isFoto ? 'Foto/OCR' : 'SMS',
+        estado: e, conf: conf == null ? null : +conf.toFixed(1),
+        hora: new Date().toLocaleTimeString('es-BO', { hour12: false }),
+      };
+      actas.unshift(newActa);
+      if (actas.length > 200) actas.pop();
+      renderSummary();
+      renderTable();
+      const firstRow = document.querySelector('#actasBody tr:first-child');
+      if (firstRow) gsap.fromTo(firstRow, { background: 'rgba(212, 165, 116, 0.18)' }, { background: 'transparent', duration: 1.4 });
+    }, 4500);
+  })();
+  </script>
+</body>
+</html>

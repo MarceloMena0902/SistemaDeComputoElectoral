@@ -1,0 +1,77 @@
+﻿name: sistema_rrv
+
+services:
+  mongo_primary:
+    image: mongo:6
+    container_name: rrv_mongo_primary
+    command: mongod --replSet rs0 --bind_ip_all --port 27017
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_primary_data:/data/db
+    networks:
+      - rrv_network
+
+  mongo_secondary:
+    image: mongo:6
+    container_name: rrv_mongo_secondary
+    command: mongod --replSet rs0 --bind_ip_all --port 27017
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_secondary_data:/data/db
+    networks:
+      - rrv_network
+    depends_on:
+      - mongo_primary
+
+  mongo_arbiter:
+    image: mongo:6
+    container_name: rrv_mongo_arbiter
+    command: mongod --replSet rs0 --bind_ip_all --port 27017 --oplogSize 1
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongo_arbiter_data:/data/db
+    networks:
+      - rrv_network
+    depends_on:
+      - mongo_primary
+
+  mongo_setup:
+    image: mongo:6
+    container_name: rrv_mongo_setup
+    depends_on:
+      - mongo_primary
+      - mongo_secondary
+      - mongo_arbiter
+    networks:
+      - rrv_network
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "⏳ Esperando que MongoDB inicie..."
+        sleep 20
+        echo "🔄 Inicializando Replica Set..."
+        mongosh --host rrv_mongo_primary:27017 --eval '
+          rs.initiate({
+            _id: "rs0",
+            members: [
+              { _id: 0, host: "rrv_mongo_primary:27017", priority: 2 },
+              { _id: 1, host: "rrv_mongo_secondary:27017", priority: 1 },
+              { _id: 2, host: "rrv_mongo_arbiter:27017", arbiterOnly: true }
+            ]
+          })
+        '
+        echo "✅ Replica Set inicializado"
+        echo "📊 Estado:"
+        mongosh --host rrv_mongo_primary:27017 --eval 'rs.status().members.forEach(m => print(m.name + " - " + m.stateStr))'
+
+networks:
+  rrv_network:
+    driver: bridge
+
+volumes:
+  mongo_primary_data:
+  mongo_secondary_data:
+  mongo_arbiter_data:
