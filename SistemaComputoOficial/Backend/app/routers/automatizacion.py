@@ -220,7 +220,18 @@ def _update_counters(state: dict, result: dict):
         state["duplicadas"] += 1
     else:
         state["errores"] += 1
-    state["recientes"].appendleft({"nro_acta": result.get("nro_acta", "?"), "estado": tipo})
+    state["recientes"].appendleft({
+        "nro_acta":      result.get("nro_acta", "?"),
+        "estado":        tipo,
+        "nro_mesa":      result.get("nro_mesa", 0),
+        "p1":            result.get("p1", 0),
+        "p2":            result.get("p2", 0),
+        "p3":            result.get("p3", 0),
+        "p4":            result.get("p4", 0),
+        "votos_blancos": result.get("votos_blancos", 0),
+        "votos_nulos":   result.get("votos_nulos", 0),
+        "total_votos":   result.get("total_votos", 0),
+    })
 
 
 async def _process_row(raw_row: dict, row_number: int, run_id: str, db_run_id: int) -> dict:
@@ -332,7 +343,18 @@ async def _process_row(raw_row: dict, row_number: int, run_id: str, db_run_id: i
                 # Ya existía — duplicado sin error
                 await db.rollback()
                 await _db_log_detalle(db_run_id, nro_acta, "DUPLICADA", [])
-                return {"tipo": "DUPLICADA", "nro_acta": nro_acta}
+                return {
+                    "tipo":          "DUPLICADA",
+                    "nro_acta":      nro_acta,
+                    "nro_mesa":      payload.get("nro_mesa", 0),
+                    "p1":            v_data["partido1"],
+                    "p2":            v_data["partido2"],
+                    "p3":            v_data["partido3"],
+                    "p4":            v_data["partido4"],
+                    "votos_blancos": v_data["votos_blancos"],
+                    "votos_nulos":   v_data["votos_nulos"],
+                    "total_votos":   v_data["total_votos"],
+                }
             acta_id = id_acta_row
 
             voto = VotoOficial(
@@ -360,7 +382,18 @@ async def _process_row(raw_row: dict, row_number: int, run_id: str, db_run_id: i
             ))
             await db.commit()
             await _db_log_detalle(db_run_id, nro_acta, val.estado, val.warnings)
-            return {"tipo": val.estado, "nro_acta": nro_acta}
+            return {
+                "tipo":          val.estado,
+                "nro_acta":      nro_acta,
+                "nro_mesa":      payload.get("nro_mesa", 0),
+                "p1":            v_data["partido1"],
+                "p2":            v_data["partido2"],
+                "p3":            v_data["partido3"],
+                "p4":            v_data["partido4"],
+                "votos_blancos": v_data["votos_blancos"],
+                "votos_nulos":   v_data["votos_nulos"],
+                "total_votos":   v_data["total_votos"],
+            }
 
         except Exception as exc:
             await db.rollback()

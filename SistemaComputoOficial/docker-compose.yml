@@ -91,15 +91,17 @@ services:
       SECRET_KEY: ${SECRET_KEY:-electoral-secret-key-2024}
       RUN_MIGRATIONS: "true"
       CSV_PATH: /app/data/actas_oficiales_transcripcion.csv
-      SELENIUM_LIMIT: "15"
+      SELENIUM_LIMIT: "10"
       BULK_CONCURRENCY: "4"
     volumes:
       - ./automatizacion/data:/app/data:ro
     ports:
-      - "4000:8000"   # Puerto 4000 externo → compatible con automatizacion existente
+      - "4001:8000"   # Puerto 4001 externo (4000 en uso por otro servicio del equipo)
     networks:
       - electoral-net
-    restart: unless-stopped
+    depends_on:
+      - haproxy
+    restart: on-failure
 
 # ─── Volumes Persistentes ────────────────────────────────────
 volumes:

@@ -222,8 +222,16 @@ class AutomatizacionIniciarResponse(BaseModel):
 
 
 class ProgresoReciente(BaseModel):
-    nro_acta: str
-    estado:   str
+    nro_acta:     str
+    estado:       str
+    nro_mesa:     int = 0
+    p1:           int = 0
+    p2:           int = 0
+    p3:           int = 0
+    p4:           int = 0
+    votos_blancos: int = 0
+    votos_nulos:  int = 0
+    total_votos:  int = 0
 
 
 class AutomatizacionProgresoResponse(BaseModel):

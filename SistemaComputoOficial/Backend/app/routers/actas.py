@@ -371,12 +371,31 @@ async def listar_actas(
 ):
     offset = (page - 1) * limit
 
-    sql = text("""
+    # Construir cláusula WHERE dinámicamente para evitar pasar None a asyncpg
+    conditions = []
+    params: dict = {"limit": limit, "offset": offset}
+
+    if estado:
+        conditions.append("a.estado = :estado")
+        params["estado"] = estado
+    if departamento:
+        conditions.append("dt.departamento = :departamento")
+        params["departamento"] = departamento
+    if origen:
+        conditions.append("a.origen = :origen")
+        params["origen"] = origen
+    if q:
+        conditions.append("a.nro_acta ILIKE :q_like")
+        params["q_like"] = f"%{q}%"
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    sql = text(f"""
         SELECT
             a.id_acta, a.nro_acta, a.codigo_mesa, m.nro_mesa, m.nro_votantes,
             a.estado, a.observacion, a.origen, a.fecha_registro,
             dt.departamento, dt.municipio, dt.provincia,
-            re.nombre_recinto,
+            re.nombre_recinto AS recinto_nombre,
             COALESCE(v.partido1, 0)                AS partido1,
             COALESCE(v.partido2, 0)                AS partido2,
             COALESCE(v.partido3, 0)                AS partido3,
@@ -392,36 +411,20 @@ async def listar_actas(
         JOIN distribucion_territorial dt ON dt.codigo_territorial = m.codigo_territorial
         LEFT JOIN recinto_electoral re   ON re.recinto_id = m.recinto_id
         LEFT JOIN voto_oficial v         ON v.id_acta = a.id_acta
-        WHERE (:estado IS NULL       OR a.estado = :estado)
-          AND (:departamento IS NULL OR dt.departamento = :departamento)
-          AND (:origen IS NULL       OR a.origen = :origen)
-          AND (:q IS NULL            OR a.nro_acta ILIKE :q_like)
-        ORDER BY a.fecha_registro DESC
+        {where}
+        ORDER BY a.id_acta DESC
         LIMIT :limit OFFSET :offset
     """)
 
-    count_sql = text("""
+    count_sql = text(f"""
         SELECT COUNT(*) FROM acta_oficial a
         JOIN mesa_electoral m            ON m.codigo_mesa = a.codigo_mesa
         JOIN distribucion_territorial dt ON dt.codigo_territorial = m.codigo_territorial
-        WHERE (:estado IS NULL       OR a.estado = :estado)
-          AND (:departamento IS NULL OR dt.departamento = :departamento)
-          AND (:origen IS NULL       OR a.origen = :origen)
-          AND (:q IS NULL            OR a.nro_acta ILIKE :q_like)
+        {where}
     """)
 
-    params = {
-        "estado":       estado,
-        "departamento": departamento,
-        "origen":       origen,
-        "q":            q,
-        "q_like":       f"%{q}%" if q else None,
-        "limit":        limit,
-        "offset":       offset,
-    }
-
     rows  = (await db.execute(sql,       params)).mappings().all()
-    total = (await db.execute(count_sql, params)).scalar()
+    total = (await db.execute(count_sql, {k: v for k, v in params.items() if k not in ("limit", "offset")})).scalar()
 
     items = [
         ActaListItem(

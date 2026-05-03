@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { oficialActas as officialSeed } from './data/oficial.mock.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { rrvActas as rrvMock } from './data/rrv.mock.js';
-import { ENABLE_API_SUBMIT, RRV_ENABLED, apiInfo, getAuditoriaOficial, getRrvActas, getProgresoOficial, getResultadosOficiales, healthOficial, registrarActaOficial } from './services/api.js';
+import { ENABLE_API_SUBMIT, RRV_ENABLED, apiInfo, getActasOficiales, getAuditoriaOficial, getRrvActas, getRrvResultadosNacionales, getProgresoOficial, getResultadosOficiales, getTerritorioDepartamentos, getTerritorioMesas, getTerritorioMunicipios, getTerritorioProvincias, getTerritorioRecintos, healthOficial, iniciarAutomatizacion, getProgresoAutomatizacion, registrarActaOficial } from './services/api.js';
 import {
   PARTIES,
   buildInconsistencias,
@@ -37,15 +36,47 @@ export default function App() {
   const [active, setActive] = useState('dashboard');
   const [customActas, setCustomActas] = useState(loadCustomActas);
   const [backendStatus, setBackendStatus] = useState({ checked: false, ok: false, label: 'sin comprobar' });
+  const [backendActas, setBackendActas] = useState([]);
+  const [backendMetricas, setBackendMetricas] = useState(null);
   const [rrvActas, setRrvActas] = useState(rrvMock);
   const [rrvStatus, setRrvStatus] = useState({ ok: false, label: RRV_ENABLED ? 'conectando...' : 'mock' });
+  const [rrvResultados, setRrvResultados] = useState(null);
+  const fetchingActasRef = useRef(false);
 
   const oficialActas = useMemo(() => {
     const customMap = new Map(customActas.map((a) => [String(a.codigoActa), a]));
-    const merged = officialSeed.map((a) => customMap.get(String(a.codigoActa)) || a);
-    const extras = customActas.filter((a) => !officialSeed.some((s) => String(s.codigoActa) === String(a.codigoActa)));
+    const merged = backendActas.map((a) => customMap.get(String(a.codigoActa)) || a);
+    const extras = customActas.filter((a) => !backendActas.some((s) => String(s.codigoActa) === String(a.codigoActa)));
     return [...extras, ...merged];
-  }, [customActas]);
+  }, [customActas, backendActas]);
+
+  const fetchBackendActas = async () => {
+    if (fetchingActasRef.current) return; // evitar llamadas concurrentes
+    fetchingActasRef.current = true;
+    try {
+      const first = await getActasOficiales({ limit: 500, page: 1 });
+      const total = first.total || 0;
+      let items = first.items || [];
+      const pages = Math.ceil(total / 500);
+      // Paginación secuencial: evita race conditions y desbordamiento de conexiones
+      for (let p = 2; p <= pages; p++) {
+        const d = await getActasOficiales({ limit: 500, page: p });
+        items = [...items, ...(d.items || [])];
+      }
+      setBackendActas(items);
+    } catch {
+      /* no limpiar en error — mantener datos previos si los hay */
+    } finally {
+      fetchingActasRef.current = false;
+    }
+  };
+
+  const fetchBackendMetricas = async () => {
+    try {
+      const data = await getMetricasDashboard();
+      setBackendMetricas(data);
+    } catch { /* silencioso */ }
+  };
 
   const saveCustomActa = (acta) => {
     setCustomActas((prev) => {
@@ -60,6 +91,8 @@ export default function App() {
     try {
       const res = await healthOficial();
       setBackendStatus({ checked: true, ok: true, label: res?.service || 'backend oficial disponible' });
+      fetchBackendMetricas();
+      fetchBackendActas();
     } catch (e) {
       setBackendStatus({ checked: true, ok: false, label: 'backend oficial no disponible' });
     }
@@ -69,21 +102,24 @@ export default function App() {
 
   useEffect(() => {
     if (!RRV_ENABLED) return;
-    getRrvActas(1000)
+    getRrvResultadosNacionales()
       .then((data) => {
-        if (data.actas.length > 0) {
-          setRrvActas(data.actas);
-          setRrvStatus({ ok: true, label: `${data.actas.length} actas reales` });
-        } else {
-          setRrvStatus({ ok: true, label: 'RRV vacío — mock activo' });
+        setRrvResultados(data);
+        if (data.total_actas) {
+          setRrvStatus({ ok: true, label: `${data.total_actas} actas RRV` });
         }
       })
-      .catch((e) => setRrvStatus({ ok: false, label: `Sin conexión — mock activo` }));
+      .catch(() => {});
+    getRrvActas(1000)
+      .then((data) => {
+        if (data.actas.length > 0) setRrvActas(data.actas);
+      })
+      .catch(() => setRrvStatus({ ok: false, label: 'Sin conexión RRV' }));
   }, []);
 
   const page = {
-    dashboard: <Dashboard oficial={oficialActas} rrv={rrvActas} />,
-    formulario: <Formulario oficial={oficialActas} onSave={saveCustomActa} backendStatus={backendStatus} onCheckBackend={checkBackend} />,
+    dashboard: <Dashboard oficial={oficialActas} rrv={rrvActas} rrvResultados={rrvResultados} backendMetricas={backendMetricas} onRefreshOficial={() => { fetchBackendMetricas(); fetchBackendActas(); }} />,
+    formulario: <Formulario oficial={oficialActas} onSave={saveCustomActa} backendStatus={backendStatus} onCheckBackend={checkBackend} onAutoComplete={() => { setActive('actas'); fetchBackendMetricas(); fetchBackendActas(); }} />,
     actas: <ActasPage oficial={oficialActas} />,
     inconsistencias: <InconsistenciasPage oficial={oficialActas} rrv={rrvActas} />,
     auditoria: <AuditoriaPage oficial={oficialActas} backendStatus={backendStatus} />,
@@ -271,12 +307,99 @@ function TerritoryResultsTable({ rows }) {
   </div>;
 }
 
-function Dashboard({ oficial, rrv }) {
+function Dashboard({ oficial, rrv, rrvResultados, backendMetricas, onRefreshOficial }) {
   const [filters, setFilters] = useState({ proceso: 'Elecciones Subnacionales 2026', departamento: '', provincia: '', municipio: '', recinto: '', mesa: '', estado: '', fuente: '', q: '' });
   const oficialF = useMemo(() => filterActas(oficial, filters), [oficial, filters]);
   const rrvF = useMemo(() => filterActas(rrv, filters), [rrv, filters]);
-  const kpis = useMemo(() => buildKpis(oficialF, rrvF), [oficialF, rrvF]);
-  const compare = useMemo(() => compareParties(oficialF, rrvF), [oficialF, rrvF]);
+
+  // When no filter is active, use the pre-aggregated national totals from /resultados-nacionales
+  // so vote counts reflect all 5,345 actas even when rrvActas only has a subset loaded
+  const hasActiveFilter = useMemo(() => {
+    const { proceso, ...rest } = filters;
+    return Object.values(rest).some(Boolean);
+  }, [filters]);
+
+  const rrvForKpis = useMemo(() => {
+    if (!hasActiveFilter && rrvResultados?.resultados) {
+      const r = rrvResultados.resultados;
+      const t = rrvResultados.totales || {};
+      const validos = Number(t.validos || 0);
+      const blancos = Number(t.blancos || 0);
+      const nulos = Number(t.nulos || 0);
+      return [{
+        p1: Number(r.p1 || 0),
+        p2: Number(r.p2 || 0),
+        p3: Number(r.p3 || 0),
+        p4: Number(r.p4 || 0),
+        votosBlancos: blancos,
+        votosNulos: nulos,
+        votosValidos: validos,
+        totalVotos: validos + blancos + nulos,
+        votantesHabilitados: 0,
+      }];
+    }
+    return rrvF;
+  }, [rrvF, rrvResultados, hasActiveFilter]);
+
+  const kpis = useMemo(() => {
+    const k = buildKpis(oficialF, rrvForKpis);
+    let result = { ...k };
+
+    // Cuando no hay filtro activo, usar los agregados del backend (siempre precisos)
+    if (!hasActiveFilter && backendMetricas) {
+      const actasOficial = backendMetricas.total_actas ?? k.actasOficial;
+      const oBm = {
+        p1: backendMetricas.total_partido1 ?? k.oficial.p1,
+        p2: backendMetricas.total_partido2 ?? k.oficial.p2,
+        p3: backendMetricas.total_partido3 ?? k.oficial.p3,
+        p4: backendMetricas.total_partido4 ?? k.oficial.p4,
+        votosValidos: backendMetricas.total_votos_validos ?? k.oficial.votosValidos,
+        votosBlancos: backendMetricas.total_votos_blancos ?? k.oficial.votosBlancos,
+        votosNulos: backendMetricas.total_votos_nulos ?? k.oficial.votosNulos,
+        totalVotos: backendMetricas.total_votos ?? k.oficial.totalVotos,
+        habilitados: backendMetricas.total_votantes ?? k.oficial.habilitados,
+      };
+      const actasRRV = rrvResultados?.total_actas ?? k.actasRRV;
+      const avance = actasRRV ? (actasOficial * 100) / Math.max(actasRRV, actasOficial) : 0;
+      const partyTotals = [
+        { key: 'p1', value: oBm.p1 }, { key: 'p2', value: oBm.p2 },
+        { key: 'p3', value: oBm.p3 }, { key: 'p4', value: oBm.p4 },
+      ].sort((a, b) => b.value - a.value);
+      result = {
+        ...k,
+        actasOficial,
+        actasRRV,
+        avance,
+        oficial: oBm,
+        participacion: oBm.habilitados ? (oBm.totalVotos * 100) / oBm.habilitados : 0,
+        diferenciaGlobal: oBm.totalVotos - (rrvForKpis[0]?.totalVotos ?? k.rrv.totalVotos),
+        ganador: PARTIES[partyTotals[0] ? ['p1','p2','p3','p4'].indexOf(partyTotals[0].key) : 0]?.label || 'Sin datos',
+        margenVictoria: (partyTotals[0]?.value ?? 0) - (partyTotals[1]?.value ?? 0),
+      };
+    } else if (!hasActiveFilter && rrvResultados?.total_actas) {
+      const actasRRV = rrvResultados.total_actas;
+      result = { ...result, actasRRV, avance: result.actasOficial ? (result.actasOficial * 100) / Math.max(actasRRV, result.actasOficial) : 0 };
+    }
+
+    return result;
+  }, [oficialF, rrvForKpis, hasActiveFilter, backendMetricas, rrvResultados]);
+  const compare = useMemo(() => {
+    if (!hasActiveFilter && backendMetricas) {
+      // Un único "acta sintética" con los totales reales del backend
+      const syntheticOficial = [{
+        p1: backendMetricas.total_partido1 || 0,
+        p2: backendMetricas.total_partido2 || 0,
+        p3: backendMetricas.total_partido3 || 0,
+        p4: backendMetricas.total_partido4 || 0,
+        votosBlancos: backendMetricas.total_votos_blancos || 0,
+        votosNulos: backendMetricas.total_votos_nulos || 0,
+        votosValidos: backendMetricas.total_votos_validos || 0,
+        totalVotos: backendMetricas.total_votos || 0,
+      }];
+      return compareParties(syntheticOficial, rrvForKpis);
+    }
+    return compareParties(oficialF, rrvForKpis);
+  }, [oficialF, rrvForKpis, hasActiveFilter, backendMetricas]);
   const deps = useMemo(() => departmentSummary(oficialF, rrvF), [oficialF, rrvF]);
   const inconsistencias = useMemo(() => buildInconsistencias(oficialF, rrvF), [oficialF, rrvF]);
   const timeline = useMemo(() => timelineByHour(rrvF), [rrvF]);
@@ -286,6 +409,7 @@ function Dashboard({ oficial, rrv }) {
   return (
     <>
       <PageHeader eyebrow="Dashboard analítico" title="RRV vs Cómputo Oficial" subtitle="Vista comparativa para detectar diferencias entre MongoDB RRV y PostgreSQL oficial.">
+        <button className="ghost" onClick={onRefreshOficial}>Actualizar oficial</button>
         <button className="primary" onClick={() => exportJson('comparativo-rrv-vs-oficial.json', { kpis, compare, technical, inconsistencias: inconsistencias.slice(0, 80) })}>Exportar JSON</button>
       </PageHeader>
       <Filters filters={filters} setFilters={setFilters} data={[...oficial, ...rrv]} title="Filtro territorial y de actas" />
@@ -416,47 +540,116 @@ function TechnicalNotesPanel({ rows }) {
   </div>;
 }
 
-function Formulario({ oficial, onSave, backendStatus, onCheckBackend }) {
-  const firstActa = oficial[0] || {};
-  const [selected, setSelected] = useState(firstActa.codigoActa || '');
-  const [territory, setTerritory] = useState(() => territoryFromActa(firstActa));
-  const selectedBase = useMemo(() => oficial.find((a) => String(a.codigoActa) === String(selected)) || null, [oficial, selected]);
-  const [form, setForm] = useState(() => toForm(selectedBase || firstActa));
+const VISUAL_LIMIT = 10; // debe coincidir con SELENIUM_LIMIT del backend
+
+function Formulario({ oficial, onSave, backendStatus, onCheckBackend, onAutoComplete }) {
+  const [selected, setSelected] = useState('');
+  const [territory, setTerritory] = useState(() => territoryFromActa({}));
+  const [form, setForm] = useState(() => toForm({}));
   const [result, setResult] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [modal, setModal] = useState(null);
+  const [territorioOpts, setTerritorioOpts] = useState({ departamentos: [], provincias: [], municipios: [], recintos: [], mesas: [] });
 
-  useEffect(() => {
-    if (!selectedBase) return;
-    setForm(toForm(selectedBase));
-    setTerritory(territoryFromActa(selectedBase));
+  // ── Automatización ──────────────────────────────────────────────
+  const [autoRunId, setAutoRunId] = useState(null);
+  const [autoProgreso, setAutoProgreso] = useState(null);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoFase, setAutoFase] = useState(null); // 'visual' | 'bulk' | 'done'
+  const pollRef = useRef(null);
+  const lastActaRef = useRef(null);
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  const startAutomatizacion = async () => {
+    if (!backendStatus.ok) {
+      setResult({ ok: false, text: 'El backend oficial no está disponible. Levanta Docker Compose primero.', response: null });
+      return;
+    }
+    if (autoRunning) return;
     setResult(null);
-    setModal(null);
-  }, [selectedBase?.codigoActa]);
+    setModal({ type: 'loading', title: 'Iniciando carga masiva CSV', text: 'Conectando con el backend...' });
+    try {
+      const res = await iniciarAutomatizacion();
+      setAutoRunId(res.run_id);
+      setAutoRunning(true);
+      setAutoFase('visual');
+      setModal(null);
+      lastActaRef.current = null;
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const p = await getProgresoAutomatizacion(res.run_id);
+          setAutoProgreso(p);
+
+          // Determinar fase
+          if (p.procesadas <= VISUAL_LIMIT && p.estado === 'EN_PROGRESO') {
+            setAutoFase('visual');
+          } else if (p.estado === 'EN_PROGRESO') {
+            setAutoFase('bulk');
+          }
+
+          // Animar formulario con el registro más reciente (solo fase visual)
+          const latest = p.recientes?.[0];
+          if (latest && latest.nro_acta !== lastActaRef.current && p.procesadas <= VISUAL_LIMIT) {
+            lastActaRef.current = latest.nro_acta;
+            setForm((prev) => ({
+              ...prev,
+              nroActa:             latest.nro_acta,
+              nroMesa:             latest.nro_mesa || prev.nroMesa,
+              p1:                  latest.p1 ?? prev.p1,
+              p2:                  latest.p2 ?? prev.p2,
+              p3:                  latest.p3 ?? prev.p3,
+              p4:                  latest.p4 ?? prev.p4,
+              votosBlancos:        latest.votos_blancos ?? prev.votosBlancos,
+              votosNulos:          latest.votos_nulos   ?? prev.votosNulos,
+            }));
+          }
+
+          // Fin de la automatización
+          if (p.estado === 'COMPLETADO' || String(p.estado).startsWith('ERROR')) {
+            clearInterval(pollRef.current);
+            setAutoRunning(false);
+            setAutoFase('done');
+            if (p.estado === 'COMPLETADO') {
+              setModal({
+                type: 'success',
+                title: 'Carga masiva completada',
+                text: `${p.exitosas} actas registradas · ${p.errores} errores · ${p.duplicadas} duplicadas`,
+                response: null,
+              });
+              onAutoComplete?.();
+            } else {
+              setModal({ type: 'error', title: 'Error en automatización', text: p.estado, response: null });
+            }
+          }
+        } catch { /* silencioso, reintenta en el siguiente tick */ }
+      }, 600);
+
+    } catch (e) {
+      setModal(null);
+      setResult({
+        ok: false,
+        text: e.status === 423 ? 'Ya hay una automatización en progreso.' : `Error al iniciar: ${e.body?.detail || e.message}`,
+        response: null,
+      });
+    }
+  };
+
+  // Cargar departamentos cuando el backend esté disponible
+  useEffect(() => {
+    if (!backendStatus.ok) {
+      setTerritorioOpts({ departamentos: [], provincias: [], municipios: [], recintos: [], mesas: [] });
+      return;
+    }
+    getTerritorioDepartamentos()
+      .then((data) => setTerritorioOpts((prev) => ({ ...prev, departamentos: data.map((d) => d.departamento) })))
+      .catch(() => {});
+  }, [backendStatus.ok]);
 
   const validation = useMemo(() => validateOfficialForm(form, oficial), [form, oficial]);
   const hardErrors = validation.issues.filter((issue) => issue.type === 'ERROR');
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
-
-  const filtered = useMemo(() => {
-    const departamentos = getUniqueOptions(oficial, 'departamento');
-    const byDepartamento = (a) => !territory.departamento || a.departamento === territory.departamento;
-    const byProvincia = (a) => byDepartamento(a) && (!territory.provincia || a.provincia === territory.provincia);
-    const byMunicipio = (a) => byProvincia(a) && (!territory.municipio || a.municipio === territory.municipio);
-    const byRecinto = (a) => byMunicipio(a) && (!territory.recintoCode || String(a.codigoRecinto) === String(territory.recintoCode));
-    return {
-      departamentos,
-      provincias: getUniqueOptions(oficial, 'provincia', byDepartamento),
-      municipios: getUniqueOptions(oficial, 'municipio', byProvincia),
-      recintos: getUniqueSelectOptions(
-        oficial,
-        'codigoRecinto',
-        (a) => a.recinto,
-        byMunicipio,
-      ),
-      actas: uniqueActasByCode(oficial.filter(byRecinto)),
-    };
-  }, [oficial, territory]);
 
   const resetFormForTerritory = (nextTerritory) => {
     setForm((prev) => ({
@@ -478,12 +671,42 @@ function Formulario({ oficial, onSave, backendStatus, onCheckBackend }) {
   const updateTerritory = (key, value) => {
     let next = { ...territory, [key]: value };
 
-    if (key === 'departamento') next = { departamento: value, provincia: '', municipio: '', recinto: '', recintoCode: '', acta: '' };
-    if (key === 'provincia') next = { ...next, municipio: '', recinto: '', recintoCode: '', acta: '' };
-    if (key === 'municipio') next = { ...next, recinto: '', recintoCode: '', acta: '' };
+    if (key === 'departamento') {
+      next = { departamento: value, provincia: '', municipio: '', recinto: '', recintoCode: '', acta: '' };
+      setTerritorioOpts((prev) => ({ ...prev, provincias: [], municipios: [], recintos: [], mesas: [] }));
+      if (value) {
+        getTerritorioProvincias(value)
+          .then((data) => setTerritorioOpts((prev) => ({ ...prev, provincias: data.map((d) => d.provincia) })))
+          .catch(() => {});
+      }
+    }
+    if (key === 'provincia') {
+      next = { ...next, municipio: '', recinto: '', recintoCode: '', acta: '' };
+      setTerritorioOpts((prev) => ({ ...prev, municipios: [], recintos: [], mesas: [] }));
+      if (value) {
+        getTerritorioMunicipios(value)
+          .then((data) => setTerritorioOpts((prev) => ({ ...prev, municipios: data.map((d) => d.municipio) })))
+          .catch(() => {});
+      }
+    }
+    if (key === 'municipio') {
+      next = { ...next, recinto: '', recintoCode: '', acta: '' };
+      setTerritorioOpts((prev) => ({ ...prev, recintos: [], mesas: [] }));
+      if (value) {
+        getTerritorioRecintos(value)
+          .then((data) => setTerritorioOpts((prev) => ({ ...prev, recintos: data })))
+          .catch(() => {});
+      }
+    }
     if (key === 'recintoCode') {
-      const selectedRecinto = filtered.recintos.find((r) => String(r.value) === String(value));
-      next = { ...next, recintoCode: value, recinto: selectedRecinto?.item?.recinto || '', acta: '' };
+      const selectedRecinto = territorioOpts.recintos.find((r) => String(r.recinto_id) === String(value));
+      next = { ...next, recintoCode: value, recinto: selectedRecinto?.nombre_recinto || '', acta: '' };
+      setTerritorioOpts((prev) => ({ ...prev, mesas: [] }));
+      if (value) {
+        getTerritorioMesas(Number(value))
+          .then((data) => setTerritorioOpts((prev) => ({ ...prev, mesas: data })))
+          .catch(() => {});
+      }
     }
 
     setTerritory(next);
@@ -492,14 +715,21 @@ function Formulario({ oficial, onSave, backendStatus, onCheckBackend }) {
     setResult(null);
   };
 
-  const updateSelectedActa = (codigoActa) => {
-    setSelected(codigoActa);
-    const acta = oficial.find((a) => String(a.codigoActa) === String(codigoActa));
-    if (acta) {
-      setTerritory({ ...territoryFromActa(acta), acta: codigoActa });
-    } else {
-      setTerritory((t) => ({ ...t, acta: codigoActa }));
+  const updateSelectedMesa = (codigoMesa) => {
+    setSelected(codigoMesa);
+    const mesa = territorioOpts.mesas.find((m) => String(m.codigo_mesa) === String(codigoMesa));
+    if (mesa) {
+      setTerritory((t) => ({ ...t, acta: String(mesa.codigo_mesa) }));
+      setForm((prev) => ({
+        ...prev,
+        codigoMesa:           mesa.codigo_mesa,
+        codigoActa:           String(mesa.codigo_mesa),
+        nroMesa:              mesa.nro_mesa,
+        votantesHabilitados:  mesa.nro_votantes,
+        nroActa:              `ACTA-${mesa.codigo_mesa}`,
+      }));
     }
+    setResult(null);
   };
 
   const save = async () => {
@@ -552,8 +782,51 @@ function Formulario({ oficial, onSave, backendStatus, onCheckBackend }) {
   return <form className="officialForm" onSubmit={submit}>
     <PageHeader eyebrow="Cómputo oficial" title="Formulario Oficial" subtitle="Captura guiada con combos dependientes para evitar datos territoriales incorrectos.">
       <button type="button" className="ghost" onClick={onCheckBackend}>Comprobar backend</button>
-      <button type="submit" className="primary" disabled={isSaving}>{isSaving ? 'Guardando...' : 'Guardar acta'}</button>
+      <button
+        type="button"
+        className={autoRunning ? 'ghost' : 'primary'}
+        onClick={startAutomatizacion}
+        disabled={autoRunning || !backendStatus.ok}
+        title={!backendStatus.ok ? 'Requiere backend disponible' : ''}
+      >
+        {autoRunning ? (autoFase === 'visual' ? '✎ Cargando registros...' : '⚡ Carga masiva en progreso...') : '⚡ Iniciar carga CSV'}
+      </button>
+      <button type="submit" className="primary" disabled={isSaving || autoRunning}>{isSaving ? 'Guardando...' : 'Guardar acta'}</button>
     </PageHeader>
+
+    {/* Panel de progreso de automatización */}
+    {autoProgreso && (
+      <Card className="autoProgressCard">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div>
+            <p className="eyebrow">
+              {autoFase === 'visual' && '✎ Fase visual — simulando entrada humana'}
+              {autoFase === 'bulk'   && '⚡ Fase masiva — cargando en paralelo'}
+              {autoFase === 'done'   && '✓ Carga completada'}
+            </p>
+            <strong>{autoProgreso.porcentaje.toFixed(1)}% · {fmt(autoProgreso.procesadas)}/{fmt(autoProgreso.total)} actas</strong>
+          </div>
+          <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+            <span style={{ color: '#2dd4bf' }}>✓ {fmt(autoProgreso.exitosas)}</span>
+            <span style={{ color: '#fb7185' }}>✕ {fmt(autoProgreso.errores)}</span>
+            <span style={{ color: '#f59e0b' }}>◌ {fmt(autoProgreso.observadas)}</span>
+            <span style={{ color: '#94a3b8' }}>↻ {fmt(autoProgreso.duplicadas)}</span>
+          </div>
+        </div>
+        <div className="progressRail">
+          <span style={{
+            width: `${autoProgreso.porcentaje}%`,
+            background: autoFase === 'done' ? '#2dd4bf' : autoFase === 'bulk' ? '#6366f1' : '#f59e0b',
+            transition: 'width 0.5s ease',
+          }} />
+        </div>
+        {autoFase === 'visual' && (
+          <p className="muted" style={{ marginTop: 6, fontSize: 11 }}>
+            El formulario se anima con los primeros {VISUAL_LIMIT} registros del CSV. El resto se carga en segundo plano.
+          </p>
+        )}
+      </Card>
+    )}
     <Card className="formTop glass">
       <div>
         <p className="eyebrow">Selección guiada</p>
@@ -572,14 +845,14 @@ function Formulario({ oficial, onSave, backendStatus, onCheckBackend }) {
         <Pill tone={selected ? 'ok' : 'warning'}>{selected ? 'Mesa cargada' : 'Seleccione una mesa'}</Pill>
       </div>
       <div className="fields comboGrid">
-        <ComboSelect label="Departamento" value={territory.departamento} options={filtered.departamentos} onChange={(v) => updateTerritory('departamento', v)} placeholder="Seleccione departamento" />
-        <ComboSelect label="Provincia" value={territory.provincia} options={filtered.provincias} onChange={(v) => updateTerritory('provincia', v)} placeholder="Seleccione provincia" disabled={!territory.departamento} />
-        <ComboSelect label="Municipio" value={territory.municipio} options={filtered.municipios} onChange={(v) => updateTerritory('municipio', v)} placeholder="Seleccione municipio" disabled={!territory.provincia} />
-        <ComboSelect label="Recinto" value={territory.recintoCode} options={filtered.recintos} onChange={(v) => updateTerritory('recintoCode', v)} placeholder="Seleccione recinto" disabled={!territory.municipio} />
-        <label className="comboSelect"><span>Mesa</span><select value={selected || ''} disabled={!territory.recintoCode} onChange={(e) => updateSelectedActa(e.target.value)}>
+        <ComboSelect label="Departamento" value={territory.departamento} options={territorioOpts.departamentos} onChange={(v) => updateTerritory('departamento', v)} placeholder={backendStatus.ok ? 'Seleccione departamento' : 'Requiere backend conectado'} disabled={!backendStatus.ok} />
+        <ComboSelect label="Provincia" value={territory.provincia} options={territorioOpts.provincias} onChange={(v) => updateTerritory('provincia', v)} placeholder="Seleccione provincia" disabled={!territory.departamento} />
+        <ComboSelect label="Municipio" value={territory.municipio} options={territorioOpts.municipios} onChange={(v) => updateTerritory('municipio', v)} placeholder="Seleccione municipio" disabled={!territory.provincia} />
+        <ComboSelect label="Recinto" value={territory.recintoCode} options={territorioOpts.recintos.map((r) => ({ value: String(r.recinto_id), label: r.nombre_recinto }))} onChange={(v) => updateTerritory('recintoCode', v)} placeholder="Seleccione recinto" disabled={!territory.municipio} />
+        <label className="comboSelect"><span>Mesa</span><select value={selected || ''} disabled={!territory.recintoCode} onChange={(e) => updateSelectedMesa(e.target.value)}>
           <option value="">{territory.recintoCode ? 'Seleccione mesa' : 'Primero seleccione recinto'}</option>
-          {filtered.actas.map((a) => <option key={a.codigoActa} value={a.codigoActa}>Mesa {a.nroMesa}</option>)}
-        </select><small>{territory.recintoCode ? `${filtered.actas.length} mesas disponibles para este recinto` : 'Bloqueado hasta seleccionar recinto'}</small></label>
+          {territorioOpts.mesas.map((m) => <option key={m.codigo_mesa} value={String(m.codigo_mesa)}>Mesa {m.nro_mesa}</option>)}
+        </select><small>{territory.recintoCode ? `${territorioOpts.mesas.length} mesas disponibles para este recinto` : 'Bloqueado hasta seleccionar recinto'}</small></label>
       </div>
     </Card>
     <section className="formLayout">
@@ -663,7 +936,7 @@ function toForm(a = {}) {
 }
 
 function labelFor(k) {
-  return ({ p1: 'Partido 1', p2: 'Partido 2', p3: 'Partido 3', p4: 'Partido 4', votosBlancos: 'Votos blancos', votosNulos: 'Votos nulos' })[k] || k;
+  return ({ p1: 'Daenerys Targaryen', p2: 'Sansa Stark', p3: 'Robert Baratheon', p4: 'Tyrion Lannister', votosBlancos: 'Votos blancos', votosNulos: 'Votos nulos' })[k] || k;
 }
 
 function onlyDigits(value) {

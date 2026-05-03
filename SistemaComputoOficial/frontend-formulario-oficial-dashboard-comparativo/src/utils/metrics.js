@@ -1,8 +1,8 @@
 export const PARTIES = [
-  { key: 'p1', label: 'Partido 1', short: 'P1' },
-  { key: 'p2', label: 'Partido 2', short: 'P2' },
-  { key: 'p3', label: 'Partido 3', short: 'P3' },
-  { key: 'p4', label: 'Partido 4', short: 'P4' },
+  { key: 'p1', label: 'Daenerys Targaryen', short: 'DT' },
+  { key: 'p2', label: 'Sansa Stark',        short: 'SS' },
+  { key: 'p3', label: 'Robert Baratheon',   short: 'RB' },
+  { key: 'p4', label: 'Tyrion Lannister',   short: 'TL' },
 ];
 
 export const fmt = (n) => new Intl.NumberFormat('es-BO').format(Number.isFinite(Number(n)) ? Math.round(Number(n)) : 0);

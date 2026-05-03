@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     SECRET_KEY:     str  = "electoral-secret-key-2024"
     RUN_MIGRATIONS: bool = True
     CSV_PATH:       str  = ""  # Se resuelve en runtime con _default_csv_path()
-    SELENIUM_LIMIT: int  = 15  # Primeras N filas procesadas "visualmente"
+    SELENIUM_LIMIT: int  = 10  # Primeras N filas procesadas "visualmente" (demo del formulario)
     BULK_CONCURRENCY: int = 4  # Workers paralelos para carga masiva
 
     model_config = {"env_file": ".env"}

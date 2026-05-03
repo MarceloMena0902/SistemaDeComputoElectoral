@@ -131,6 +131,27 @@ export async function getEstadoAutomatizacion() {
   return request('/api/automatizacion/estado');
 }
 
+// ─── Territorio (cascade ComboBox) ───────────────────────────
+export async function getTerritorioDepartamentos() {
+  return request('/api/territorio/departamentos');
+}
+
+export async function getTerritorioProvincias(depto) {
+  return request(`/api/territorio/provincias?depto=${encodeURIComponent(depto)}`);
+}
+
+export async function getTerritorioMunicipios(prov) {
+  return request(`/api/territorio/municipios?prov=${encodeURIComponent(prov)}`);
+}
+
+export async function getTerritorioRecintos(mun) {
+  return request(`/api/territorio/recintos?mun=${encodeURIComponent(mun)}`);
+}
+
+export async function getTerritorioMesas(recintoId) {
+  return request(`/api/territorio/mesas?recintoId=${recintoId}`);
+}
+
 // ─── Util ────────────────────────────────────────────────────────
 export async function tryGetJsonFrom(url) {
   const res = await fetch(url);

@@ -9,7 +9,23 @@
       "Bash(command -v python3)",
       "Bash(/c/Users/Marcelo/AppData/Local/Microsoft/WindowsApps/python3 -c ' *)",
       "Bash(netstat -ano)",
-      "Bash(findstr \":5173 \\\\|:5174 \")"
+      "Bash(findstr \":5173 \\\\|:5174 \")",
+      "Bash(node --input-type=module --eval \"import\\('./src/App.jsx'\\)\")",
+      "Bash(npx --yes acorn --ecma2022 --module src/App.jsx)",
+      "Bash(npx --yes --quiet vite build)",
+      "Bash(tasklist *)",
+      "Bash(curl -s --max-time 5 http://localhost:4001/)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(python -m json.tool)",
+      "Bash(docker exec *)",
+      "Bash(docker network *)",
+      "Bash(docker restart *)",
+      "Bash(curl *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k\\) for k in d.get\\('paths',{}\\).keys\\(\\)]\")",
+      "Bash(docker compose *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'total={d[\\\\\"total\\\\\"]} items={len\\(d[\\\\\"items\\\\\"]\\)}'\\)\")",
+      "Bash(npx vite *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k not in ['por_estado','throughput_por_hora','top_errores']}, indent=2\\)\\)\")"
     ]
   }
 }
